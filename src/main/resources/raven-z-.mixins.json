@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "package": "com.raven.ravenz.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ChatScreenMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "EntityMixin",
+    "ExampleMixin",
+    "GameRendererMixin",
+    "HandledScreenAccessor",
+    "HandledScreenMixin",
+    "InGameHudMixin",
+    "KeybindingMixin",
+    "KeyboardMixin",
+    "LivingEntityMixin",
+    "MinecraftClientAccessor",
+    "MinecraftClientMixin",
+    "MixinClientConnection",
+    "MouseHandlerAccessor",
+    "MouseMixin",
+    "PlayerEntityMixin",
+    "ProjectileUtilMixin",
+    "ScreenMixin",
+    "WorldRendererAccessor",
+    "WorldRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
