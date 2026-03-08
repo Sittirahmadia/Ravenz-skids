@@ -29,7 +29,7 @@ public class FontManager {
     @SneakyThrows
     public FontRenderer create(float size, String name) {
         String fileName = name.endsWith(".ttf") || name.endsWith(".otf") ? name : name + ".ttf";
-        String path = "assets/raven-z-/fonts/" + fileName;
+        String path = "assets/krypton/fonts/" + fileName;
 
         try (InputStream inputStream = RavenZClient.class.getClassLoader().getResourceAsStream(path)) {
             if (inputStream == null) {

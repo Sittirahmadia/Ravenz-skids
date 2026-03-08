@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 @Getter
 public final class RavenZClient implements ClientModInitializer {
 
-    public static final String CLIENT_VERSION = "v1.0";
+    public static final String CLIENT_VERSION = "0.2.10";
     public static final boolean shouldUseMouseEvent = System.getProperty(
         "os.name"
     )
@@ -32,7 +32,7 @@ public final class RavenZClient implements ClientModInitializer {
     public final ProfileManager profileManager;
     public final MouseModuleHandler mouseModuleHandler;
     public final NotificationManager notificationManager;
-    private final Logger logger = LoggerFactory.getLogger("Raven-Z-");
+    private final Logger logger = LoggerFactory.getLogger("Krypton");
 
     public RavenZClient() {
         INSTANCE = this;

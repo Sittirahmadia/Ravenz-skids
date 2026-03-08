@@ -26,7 +26,7 @@ import java.awt.*;
 
 public final class TargetESP extends Module {
 
-    private static final Identifier FIREFLY_TEXTURE = Identifier.of("raven-z-", "textures/visuals/firefly.png");
+    private static final Identifier FIREFLY_TEXTURE = Identifier.of("krypton", "textures/visuals/firefly.png");
     private static final BufferAllocator TARGET_ESP_BUFFER_ALLOCATOR = new BufferAllocator(1 << 16);
 
     private final ModeSetting targets = new ModeSetting("Targets", "Players", "Players", "Living");

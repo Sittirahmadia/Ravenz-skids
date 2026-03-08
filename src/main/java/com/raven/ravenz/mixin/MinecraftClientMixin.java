@@ -49,7 +49,7 @@ public class MinecraftClientMixin implements IMinecraft {
         if (optionalClientModule.isPresent()) {
             Client client = optionalClientModule.get();
             if (client.isEnabled() && client.getTitle()) {
-                cir.setReturnValue("RidhoXNoqwd 1.21.11");
+                cir.setReturnValue("krypton 1.21.11");
             }
         }
     }

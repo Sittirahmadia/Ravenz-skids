@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "raven-z-",
+  "id": "krypton",
   "version": "${version}",
-  "name": "Raven-Z- Client",
-  "description": "Raven-Z- Client for Fabric 1.21.11",
+  "name": "Krypton Client",
+  "description": "Krypton Client for Fabric 1.21.11",
   "contact": {
     "sources": "https://github.com/Noryea/motionblur-fabric",
     "issues": "https://github.com/Noryea/motionblur-fabric/issues"
   },
   "license": "CC0-1.0",
-  "icon": "assets/raven-z-/icon.png",
-  "accessWidener": "raven-z-.accesswidener",
+  "icon": "assets/krypton/icon.png",
+  "accessWidener": "krypton.accesswidener",
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -18,7 +18,7 @@
     ]
   },
   "mixins": [
-    "raven-z-.mixins.json"
+    "krypton.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.18.3",

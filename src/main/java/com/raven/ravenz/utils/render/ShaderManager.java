@@ -48,7 +48,7 @@ public class ShaderManager {
 
     private static int loadShader(String path, int type) {
         try {
-            Identifier identifier = Identifier.of("raven-z-", path);
+            Identifier identifier = Identifier.of("krypton", path);
             Resource resource = MinecraftClient.getInstance().getResourceManager().getResource(identifier).orElse(null);
 
             if (resource == null) {

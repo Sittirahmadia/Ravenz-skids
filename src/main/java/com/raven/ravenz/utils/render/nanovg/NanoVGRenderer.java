@@ -324,7 +324,7 @@ public class NanoVGRenderer {
             if (p.contains(":")) {
                 return Identifier.of(p);
             }
-            return Identifier.of("raven-z-", p);
+            return Identifier.of("krypton", p);
         } catch (Throwable ignored) {
             return null;
         }

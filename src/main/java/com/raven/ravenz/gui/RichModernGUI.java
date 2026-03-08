@@ -463,7 +463,7 @@ public class RichModernGUI extends Screen {
 
         NanoVGRenderer.drawRoundedRect(px + w / 2f - 28, py + 18, 56, 3, 1.5f, a(accent, al * 0.55f));
 
-        String title = "RidhoXNoqwd Client";
+        String title = "Krypton Client";
         NanoVGRenderer.drawText(title,
                 px + (w - NanoVGRenderer.getTextWidth(title, 18f, true)) / 2f,
                 py + 36, 18f, a(C_TEXT, al), true);
@@ -476,7 +476,7 @@ public class RichModernGUI extends Screen {
         float sy = py + 86;
         renderDivider(px + PAD, sy, w - PAD * 2, "Developers", al);
         sy += SECTION_H + 6;
-        renderCreditEntry(px, sy, w, "RidhoXNoqwd / 3xecutablefile", "Lead Developer", al, accent);
+        renderCreditEntry(px, sy, w, "Krypton Developers", "Lead Developer", al, accent);
     }
 
     private void renderCreditEntry(float px, float y, float w, String name, String role, float al, Color accent) {

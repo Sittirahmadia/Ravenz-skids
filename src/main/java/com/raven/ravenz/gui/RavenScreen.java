@@ -33,7 +33,7 @@ import java.util.Map;
 
 public class RavenScreen extends Screen {
 
-    private static final Identifier SMH_LOGO_ID = Identifier.of("raven-z-", "smh.png");
+    private static final Identifier SMH_LOGO_ID = Identifier.of("krypton", "smh.png");
     private static final int RADIUS = 10;
 
     private static Identifier loadedLogoId;
@@ -110,7 +110,7 @@ public class RavenScreen extends Screen {
     private int maxSettingsScroll;
 
     public RavenScreen() {
-        super(Text.literal("RidhoXNoqwd"));
+        super(Text.literal("krypton"));
     }
 
     @Override
@@ -329,7 +329,7 @@ public class RavenScreen extends Screen {
     }
 
     private void drawTitle(DrawContext context) {
-        String title = "RidhoXNoqwd";
+        String title = "krypton";
         String subtitle = "Integrated module control";
         int titleWidth = textRenderer.getWidth(title);
         context.drawText(textRenderer, title, centerX - (titleWidth / 2), cardY + 66, 0xFFEEC3FF, false);

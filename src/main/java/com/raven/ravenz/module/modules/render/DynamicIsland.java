@@ -51,7 +51,7 @@ public class DynamicIsland extends Module {
     }
 
     private void render() {
-        String title = "RidhoXNoqwd";
+        String title = "krypton";
         String fpsText = "⚡ " + mc.getCurrentFps() + " fps";
 
         float textHeight = NanoVGRenderer.getTextHeight(TEXT_SIZE);

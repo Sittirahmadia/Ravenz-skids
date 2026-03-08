@@ -80,7 +80,7 @@ public final class ChatUtil implements IMinecraft {
 
     public static void addChatMessage(String text) {
         if (mc.player == null || mc.world == null || Objects.isNull(mc.inGameHud) || mc.inGameHud.getChatHud() == null) {
-            RavenZClient.INSTANCE.getLogger().info("[Raven-Z-] " + text);
+            RavenZClient.INSTANCE.getLogger().info("[krypton] " + text);
             return;
         }
         mc.inGameHud.getChatHud().addMessage(Text.of(text));
@@ -102,7 +102,7 @@ public final class ChatUtil implements IMinecraft {
     public static MutableText chatPrefix() {
         return BRACKET_COLOR.copy()
                 .append("[")
-                .append(ChatUtil.colorFade("raven-z-", Style.EMPTY, new Color(0, 191, 255), new Color(0, 255, 127)))
+                .append(ChatUtil.colorFade("krypton", Style.EMPTY, new Color(0, 191, 255), new Color(0, 255, 127)))
                 .append("]")
                 .append(" ");
     }

@@ -14,7 +14,7 @@ public final class ClickGUIModule extends Module {
             ThemeManager.getThemeNamesArray());
 
     public ClickGUIModule() {
-        super("Click Gui", "Toggles the Raven-Z- GUI", GLFW.GLFW_KEY_RIGHT_SHIFT, Category.CLIENT);
+        super("Click Gui", "Toggles the Krypton GUI", GLFW.GLFW_KEY_RIGHT_SHIFT, Category.CLIENT);
         addSettings(theme);
     }
 

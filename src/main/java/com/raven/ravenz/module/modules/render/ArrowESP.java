@@ -19,7 +19,7 @@ import org.lwjgl.opengl.GL11;
 import java.awt.Color;
 
 public final class ArrowESP extends Module {
-    private static final Identifier ARROW_TEXTURE = Identifier.of("raven-z-", "textures/visuals/triangle.png");
+    private static final Identifier ARROW_TEXTURE = Identifier.of("krypton", "textures/visuals/triangle.png");
 
     private final BooleanSetting showSelf = new BooleanSetting("Show Self", false);
     private final NumberSetting range = new NumberSetting("Range", 10.0D, 200.0D, 120.0D, 5.0D);

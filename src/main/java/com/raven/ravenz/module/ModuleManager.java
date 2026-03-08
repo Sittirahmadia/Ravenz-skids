@@ -65,7 +65,7 @@ public final class ModuleManager {
                 new XbowCart(), new HitCob(),
                 new SpearKill(), new SpearSwap(),
                 new AimAssist(), new Hitboxes(),
-                new AirAnchor(), new AutoAnchor(), new AutoHitCrystal(),
+                new AutoAnchor(), new AutoHitCrystal(),
                 new AutoCrystal(), new AutoDtap(),
                 new com.raven.ravenz.module.modules.combat.AutoDoubleHand(), new com.raven.ravenz.module.modules.combat.AutoInventoryTotem(), new TriggerBotV2());
         // Movement
@@ -89,7 +89,7 @@ public final class ModuleManager {
         add(
                 new CartKey(), new HoverTotem(), new MiddleClickFriend(),
                 new PearlKey(), new PearlCatch(), new WindChargeKey(), new Teams(), new FakePlayer(),
-                new Friends(), new AsmrKeyboard(), new DoubleAnchor(), new SafeAnchorAuto(), new MaceTarget());
+                new Friends(), new AsmrKeyboard(), new DoubleAnchor(), new SafeAnchorAuto());
 
         // Client
         add(new ClickGUIModule(), new NewClickGUIModule(), new RichModernGUIModule(), new ClientSettingsModule(), new Client(), new Debugger(),

@@ -33,7 +33,7 @@ public class Agent {
             System.setProperty("fabric.addMods", fabricAddMods + File.pathSeparator + jarPath);
         }
 
-        System.out.println("[Raven-Z- Agent] Successfully injected mod: " + jarPath);
+        System.out.println("[Krypton Agent] Successfully injected mod: " + jarPath);
     }
 
     private static String getCurrentJarPath() {
@@ -56,11 +56,11 @@ public class Agent {
             File file = new File(uri);
 
             String absolutePath = file.getAbsolutePath();
-            System.out.println("[Raven-Z- Agent] Detected JAR path: " + absolutePath);
+            System.out.println("[Krypton Agent] Detected JAR path: " + absolutePath);
 
             return absolutePath;
         } catch (Exception e) {
-            System.err.println("[Raven-Z- Agent] Error getting JAR path: " + e.getMessage());
+            System.err.println("[Krypton Agent] Error getting JAR path: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

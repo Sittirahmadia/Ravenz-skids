@@ -4,6 +4,6 @@ import net.minecraft.util.Identifier;
 
 public final class ResourceProvider {
     public static Identifier getShaderIdentifier(String name) {
-        return Identifier.of("raven-z-", "core/" + name);
+        return Identifier.of("krypton", "core/" + name);
     }
 }

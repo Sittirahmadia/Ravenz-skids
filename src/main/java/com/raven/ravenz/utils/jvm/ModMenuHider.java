@@ -16,7 +16,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class ModMenuHider {
-    private static final String MOD_ID = "raven-z-";
+    private static final String MOD_ID = "krypton";
 
     public static void hideFromModMenu() {
         File configDir = FabricLoader.getInstance().getConfigDir().toFile();

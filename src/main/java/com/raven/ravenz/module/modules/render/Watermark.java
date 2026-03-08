@@ -52,7 +52,7 @@ public class Watermark extends Module {
     public Watermark() {
         super("Watermark", "Displays client watermark", -1, Category.RENDER);
         
-        this.text = new StringSetting("Text", "RidhoXNoqwd");
+        this.text = new StringSetting("Text", "krypton");
         this.transparency = new NumberSetting("Transparency", 0, 255, 200, 1);
         this.colorMode = new ModeSetting("Color Mode", "Theme", "Theme", "Custom");
         this.customColor = new ColorSetting("Custom Color", new Color(255, 255, 255));
@@ -104,16 +104,16 @@ public class Watermark extends Module {
 
     private void loadIcons() {
         if (fpsIcon == -1) {
-            fpsIcon = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/fps.png");
+            fpsIcon = NanoVGRenderer.loadImage("assets/krypton/textures/icons/fps.png");
         }
         if (userIcon == -1) {
-            userIcon = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/user.png");
+            userIcon = NanoVGRenderer.loadImage("assets/krypton/textures/icons/user.png");
         }
         if (clockIcon == -1) {
-            clockIcon = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/clock.png");
+            clockIcon = NanoVGRenderer.loadImage("assets/krypton/textures/icons/clock.png");
         }
         if (pingIcon == -1) {
-            pingIcon = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/ping.png");
+            pingIcon = NanoVGRenderer.loadImage("assets/krypton/textures/icons/ping.png");
         }
     }
 

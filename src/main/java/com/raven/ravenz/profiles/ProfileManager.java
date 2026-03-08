@@ -24,7 +24,7 @@ public final class ProfileManager {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     @Getter
     private final File profileDir = RavenZClient.mc != null && RavenZClient.mc.runDirectory != null
-            ? new File(RavenZClient.mc.runDirectory, "raven-z-" + File.separator + "profiles")
+            ? new File(RavenZClient.mc.runDirectory, "krypton" + File.separator + "profiles")
             : new File("profiles");
 
     public ProfileManager() {

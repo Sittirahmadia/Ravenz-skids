@@ -52,13 +52,13 @@ public class ConfigPanel {
     
     private void loadIcons() {
         if (fileIconImage == -1) {
-            fileIconImage = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/file.png");
+            fileIconImage = NanoVGRenderer.loadImage("assets/krypton/textures/icons/file.png");
         }
         if (downloadIconImage == -1) {
-            downloadIconImage = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/download.png");
+            downloadIconImage = NanoVGRenderer.loadImage("assets/krypton/textures/icons/download.png");
         }
         if (saveIconImage == -1) {
-            saveIconImage = NanoVGRenderer.loadImage("assets/raven-z-/textures/icons/save.png");
+            saveIconImage = NanoVGRenderer.loadImage("assets/krypton/textures/icons/save.png");
         }
     }
 
