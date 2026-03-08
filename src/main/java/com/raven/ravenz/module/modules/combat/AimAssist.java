@@ -75,9 +75,9 @@ public class AimAssist extends Module {
 
     private Vec3d getAimPos(PlayerEntity target) {
         return switch (aimAt.getMode()) {
-            case "Chest" -> target.getPos().add(0, target.getHeight() * 0.5, 0);
-            case "Legs"  -> target.getPos().add(0, 0.1, 0);
-            default      -> target.getPos().add(0, target.getHeight(), 0);
+            case "Chest" -> new net.minecraft.util.math.Vec3d(target.getX(), target.getY() + target.getHeight() * 0.5, target.getZ());
+            case "Legs"  -> new net.minecraft.util.math.Vec3d(target.getX(), target.getY() + 0.1, target.getZ());
+            default      -> new net.minecraft.util.math.Vec3d(target.getX(), target.getY() + target.getHeight(), target.getZ());
         };
     }
 

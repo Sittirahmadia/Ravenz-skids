@@ -68,7 +68,7 @@ public class AutoAnchor extends Module {
             }
             if (placeClock < placeDelay.getValueInt()) { placeClock++; return; }
             ActionResult res = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            if (res.isAccepted() && res.shouldSwingHand()) mc.player.swingHand(Hand.MAIN_HAND);
+            if (res.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
             placeClock = 0;
 
         } else if (!chargeOnly.getValue()) {
@@ -84,7 +84,7 @@ public class AutoAnchor extends Module {
             }
             if (placeClock < placeDelay.getValueInt()) { placeClock++; return; }
             ActionResult res = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
-            if (res.isAccepted() && res.shouldSwingHand()) mc.player.swingHand(Hand.MAIN_HAND);
+            if (res.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
             placeClock = 0;
             hasAnchored = true;
         }

@@ -66,7 +66,7 @@ public final class ModuleManager {
                 new SpearKill(), new SpearSwap(),
                 new AimAssist(), new Hitboxes(),
                 new AirAnchor(), new AutoAnchor(), new AutoHitCrystal(),
-                new AutoDoubleHand(), new AutoInventoryTotem(), new TriggerBotV2());
+                new com.raven.ravenz.module.modules.combat.AutoDoubleHand(), new com.raven.ravenz.module.modules.combat.AutoInventoryTotem(), new TriggerBotV2());
         // Movement
         add(new Sprint(), new AutoFirework(), new AutoHeadHitter(), new KeepSprint(), new SnapTap());
 

@@ -80,7 +80,7 @@ public class AutoHitCrystal extends Module {
                 if (clickSimulation.getValue()) ClickSimulator.leftClick();
 
                 ActionResult res = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, blockHit);
-                if (res.isAccepted() && res.shouldSwingHand()) mc.player.swingHand(Hand.MAIN_HAND);
+                if (res.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
 
                 placeClock = placeDelay.getValueInt();
                 crystalling = true;
@@ -115,7 +115,7 @@ public class AutoHitCrystal extends Module {
             // Place crystal on obsidian
             if (mc.crosshairTarget instanceof BlockHitResult bh) {
                 ActionResult res = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, bh);
-                if (res.isAccepted() && res.shouldSwingHand()) mc.player.swingHand(Hand.MAIN_HAND);
+                if (res.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
             }
         }
     }

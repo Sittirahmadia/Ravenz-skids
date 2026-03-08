@@ -105,7 +105,7 @@ public class AutoDoubleHand extends Module {
         }
 
         double r = predictRadius.getValue();
-        Vec3d pos = mc.player.getPos();
+        Vec3d pos = new net.minecraft.util.math.Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
 
         // Check existing end crystals
         var crystals = mc.world.getEntitiesByClass(
@@ -114,7 +114,7 @@ public class AutoDoubleHand extends Module {
                 e -> true);
 
         for (EndCrystalEntity crystal : crystals) {
-            if (wouldLethal(crystal.getPos())) { swapTotemToOffhand(); return; }
+            if (wouldLethal(new net.minecraft.util.math.Vec3d(crystal.getX(), crystal.getY(), crystal.getZ()))) { swapTotemToOffhand(); return; }
         }
 
         // Predict future crystal positions on nearby obsidian/bedrock
@@ -138,7 +138,7 @@ public class AutoDoubleHand extends Module {
 
     /** True if a crystal at {@code crystalPos} would be lethal to the local player. */
     private boolean wouldLethal(Vec3d crystalPos) {
-        double dist = mc.player.getPos().add(0, mc.player.getEyeHeight(mc.player.getPose()) * 0.5, 0)
+        double dist = new net.minecraft.util.math.Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()).add(0, mc.player.getEyeHeight(mc.player.getPose()) * 0.5, 0)
                 .distanceTo(crystalPos);
         // Rough estimate: max damage ~120 at distance 0, drops off over ~12 blocks
         double roughDmg = Math.max(0, 120.0 * Math.pow(Math.max(0, 1.0 - dist / 12.0), 2));

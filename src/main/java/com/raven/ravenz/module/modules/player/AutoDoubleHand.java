@@ -55,7 +55,7 @@ public final class AutoDoubleHand extends Module {
 
         // ── On Pop: offhand had a totem, now it doesn't ───────────────────
         if (onPop.getValue()) {
-            boolean hasOffhandTotem = inventory.offHand.get(0).isOf(Items.TOTEM_OF_UNDYING);
+            boolean hasOffhandTotem = inventory.offhand.get(0).isOf(Items.TOTEM_OF_UNDYING);
             if (!hasOffhandTotem && !offhandPopped) {
                 offhandPopped = true;
                 InventoryUtil.swapToSlot(Items.TOTEM_OF_UNDYING);
@@ -87,7 +87,7 @@ public final class AutoDoubleHand extends Module {
 
         List<EndCrystalEntity> crystals = nearbyCrystals();
         for (EndCrystalEntity crystal : crystals) {
-            double damage = estimateCrystalDamage(crystal.getPos());
+            double damage = estimateCrystalDamage(new net.minecraft.util.math.Vec3d(crystal.getX(), crystal.getY(), crystal.getZ()));
             if (damage >= mc.player.getHealth() + mc.player.getAbsorptionAmount()) {
                 InventoryUtil.swapToSlot(Items.TOTEM_OF_UNDYING);
                 break;
@@ -99,7 +99,7 @@ public final class AutoDoubleHand extends Module {
 
     private List<EndCrystalEntity> nearbyCrystals() {
         double r = crystalRange.getValue();
-        Vec3d pos = mc.player.getPos();
+        Vec3d pos = new net.minecraft.util.math.Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
         return mc.world.getEntitiesByClass(EndCrystalEntity.class,
                 new Box(pos.subtract(r, r, r), pos.add(r, r, r)),
                 e -> true);
@@ -111,7 +111,7 @@ public final class AutoDoubleHand extends Module {
      * distance-based explosion damage without full raycasting.
      */
     private double estimateCrystalDamage(Vec3d crystalPos) {
-        double dist = mc.player.getPos().distanceTo(crystalPos);
+        double dist = new net.minecraft.util.math.Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ()).distanceTo(crystalPos);
         double maxDamage = 97.0; // approximate max end crystal explosion damage
         double radius = 12.0;
         if (dist > radius) return 0;
