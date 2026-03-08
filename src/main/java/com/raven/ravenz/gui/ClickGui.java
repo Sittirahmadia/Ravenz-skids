@@ -2,553 +2,441 @@ package com.raven.ravenz.gui;
 
 import com.raven.ravenz.RavenZClient;
 import com.raven.ravenz.gui.animation.AnimationManager;
-import com.raven.ravenz.gui.components.SettingsRenderer;
-import com.raven.ravenz.gui.components.UIRenderer;
-import com.raven.ravenz.gui.events.GuiEventHandler;
-import com.raven.ravenz.gui.utils.SearchUtils;
 import com.raven.ravenz.module.Category;
 import com.raven.ravenz.module.Module;
 import com.raven.ravenz.module.modules.client.ClickGUIModule;
-import com.raven.ravenz.module.setting.NumberSetting;
-import com.raven.ravenz.utils.render.font.FontManager;
-import com.raven.ravenz.utils.render.font.fonts.FontRenderer;
-import com.raven.ravenz.gui.theme.Theme;
-import com.raven.ravenz.gui.theme.ThemeManager;
+import com.raven.ravenz.module.setting.*;
+import com.raven.ravenz.utils.keybinding.KeyUtils;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
 
 import java.awt.*;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public final class ClickGui extends Screen {
-    private static final Map<Module, Boolean> lastModuleExpanded = new HashMap<>();
-    private static final int SIDEBAR_WIDTH = 180;
-    private static final int CONTAINER_WIDTH = SIDEBAR_WIDTH + 600;
-    private static final int COLOR_PICKER_PANEL_WIDTH = 250;
-    private static final int HEADER_HEIGHT = 60;
-    private static final int MODULE_HEIGHT = 48;
-    private static final int PADDING = 18;
-    private static final int SETTING_HEIGHT = 28;
-    private static final int SEARCH_BAR_WIDTH = 200;
-    private static final int SEARCH_BAR_HEIGHT = 32;
-    private static Category lastSelectedCategory = Category.COMBAT;
-    private static int lastScrollOffset = 0;
-    private final Map<Module, Boolean> moduleExpanded = new HashMap<>();
-    private final Map<NumberSetting, Boolean> sliderDragging = new HashMap<>();
-    private final ColorPickerManager colorPickerManager;
+
+    // Layout
+    private static final int COL_W      = 210;
+    private static final int COL_GAP    = 6;
+    private static final int HEADER_H   = 32;
+    private static final int MOD_H      = 22;
+    private static final int SETTING_H  = 26;
+    private static final int PANEL_PAD  = 10;
+
+    private static final Category[] COLS = {
+        Category.COMBAT, Category.PLAYER, Category.MOVEMENT,
+        Category.RENDER, Category.MISC, Category.CLIENT
+    };
+
+    // Colors
+    private static final Color COL_BG         = new Color(18, 22, 42, 215);
+    private static final Color HEADER_BG      = new Color(28, 33, 58, 230);
+    private static final Color HEADER_LINE    = new Color(75, 95, 180, 200);
+    private static final Color MOD_ENABLED    = new Color(230, 235, 255, 255);
+    private static final Color MOD_DISABLED   = new Color(130, 140, 175, 255);
+    private static final Color MOD_HOVER_BG   = new Color(45, 52, 88, 200);
+    private static final Color MOD_ACTIVE_BAR = new Color(100, 125, 240, 255);
+    private static final Color SETTINGS_BG    = new Color(14, 18, 36, 240);
+    private static final Color SLIDER_BG      = new Color(40, 48, 80, 255);
+    private static final Color SLIDER_FILL    = new Color(90, 115, 230, 255);
+    private static final Color CHECK_ON       = new Color(90, 115, 230, 255);
+    private static final Color ACCENT_TEXT    = new Color(180, 195, 255, 255);
+    private static final Color MUTED_TEXT     = new Color(120, 130, 165, 255);
+    private static final Color WHITE_C        = new Color(230, 235, 255, 255);
+    private static final Color DROP_BG        = new Color(20, 25, 48, 245);
+
+    // State
     private final AnimationManager animationManager;
-    private final GuiEventHandler eventHandler;
-    private final FontRenderer titleFont;
-    private final FontRenderer regularFont;
-    private final FontRenderer smallFont;
-    private final float typedTitleElapsed = 0f;
-    private final long lastCursorBlink = 0;
-    private final List<String> configs = new ArrayList<>();
-    private String configName = "";
-    private boolean configNameFocused = false;
-    private String selectedConfig = "";
+    private Module openSettingsModule = null;
+    private NumberSetting draggingSlider = null;
+    private int sliderTrackX = 0;
+    private int sliderTrackW = 0;
+    private KeybindSetting listeningKeybind = null;
+    private String searchQuery = "";
+    private int scrollOffset = 0;
+    private int maxScrollOffset = 0;
+    private ModeSetting openDropdown = null;
+    private int dropdownX = 0, dropdownY = 0, dropdownW = 0;
 
     public ClickGui() {
         super(Text.empty());
-
-        FontManager fontManager = RavenZClient.INSTANCE.getFontManager();
-        this.titleFont = fontManager.getSize(24, FontManager.Type.Poppins);
-        this.regularFont = fontManager.getSize(16, FontManager.Type.Inter);
-        this.smallFont = fontManager.getSize(14, FontManager.Type.Inter);
-
         this.animationManager = new AnimationManager();
-        this.eventHandler = new GuiEventHandler(moduleExpanded, sliderDragging, lastSelectedCategory);
-        this.colorPickerManager = new ColorPickerManager(eventHandler);
-
         animationManager.initializeGuiAnimation();
-
-        for (Module module : RavenZClient.INSTANCE.getModuleManager().getModules()) {
-            moduleExpanded.put(module, lastModuleExpanded.getOrDefault(module, false));
-            animationManager.initializeModuleAnimations(module);
+        for (Module m : RavenZClient.INSTANCE.getModuleManager().getModules()) {
+            animationManager.initializeModuleAnimations(m);
         }
-        eventHandler.setScrollOffset(lastScrollOffset);
-
-        loadConfigs();
     }
 
     @Override
-    public void init() {
-        super.init();
-        animationManager.initializeGuiAnimation();
-    }
-
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
+    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         animationManager.updateAnimations(delta);
         animationManager.updateGuiAnimations(delta);
 
         if (animationManager.shouldCloseGui()) {
-            lastSelectedCategory = eventHandler.getSelectedCategory();
-            lastScrollOffset = eventHandler.getScrollOffset();
-            lastModuleExpanded.clear();
-            lastModuleExpanded.putAll(moduleExpanded);
-            RavenZClient.INSTANCE.getModuleManager().getModule(ClickGUIModule.class)
-                    .ifPresent(module -> module.setEnabled(false));
+            RavenZClient.INSTANCE.getModuleManager()
+                .getModule(ClickGUIModule.class)
+                .ifPresent(m -> m.setEnabled(false));
             super.close();
             return;
         }
 
-        int screenWidth = width;
-        int screenHeight = height;
+        float anim = animationManager.getGuiAnimation();
+        int alpha = (int)(anim * 255);
+        if (alpha <= 0) return;
 
-        var matrices = context.getMatrices();
-        matrices.pushMatrix();
+        // Full-screen dark overlay (since ScreenMixin cancels default background)
+        ctx.fill(0, 0, width, height, new Color(0, 0, 0, (int)(anim * 140)).getRGB());
 
-        float centerX = screenWidth / 2f;
-        float centerY = screenHeight / 2f;
+        int numCols = COLS.length;
+        int totalW  = numCols * COL_W + (numCols - 1) * COL_GAP;
+        int startX  = Math.max(PANEL_PAD, (width - totalW) / 2);
 
-        matrices.translate(centerX, centerY);
-        
-        float finalScale = Math.max(0.05f, animationManager.getScaleAnimation() * getGuiScaleMultiplier());
-        
-        int transformedMouseX = (int) ((mouseX - centerX) / finalScale + centerX);
-        int transformedMouseY = (int) ((mouseY - centerY) / finalScale + centerY);
-        
-        matrices.scale(finalScale, finalScale);
-        matrices.translate(-centerX, -centerY);
+        // Compute max column height for scroll
+        int maxH = 0;
+        for (Category cat : COLS) {
+            List<Module> mods = filteredModules(cat);
+            int h = HEADER_H + mods.size() * MOD_H;
+            if (openSettingsModule != null && openSettingsModule.getModuleCategory() == cat) {
+                h += settingsHeight(openSettingsModule);
+            }
+            if (h > maxH) maxH = h;
+        }
+        maxScrollOffset = Math.max(0, maxH - (height - PANEL_PAD * 2));
+        scrollOffset = Math.min(scrollOffset, maxScrollOffset);
 
-        int containerX = (screenWidth - CONTAINER_WIDTH) / 2;
-        int containerY = (screenHeight - 500) / 2;
-        int containerWidth = CONTAINER_WIDTH;
-        int containerHeight = 500;
+        int startY = PANEL_PAD - scrollOffset;
 
-    int alpha = (int) (animationManager.getGuiAnimation() * 240);
-    Color containerColor = applyAlpha(theme.containerBg(), alpha);
-    context.fill(containerX, containerY, containerX + containerWidth, containerY + containerHeight, containerColor.getRGB());
-
-    renderSidebar(context, containerX, containerY, containerHeight, transformedMouseX, transformedMouseY);
-
-        renderContent(context, containerX + SIDEBAR_WIDTH, containerY, CONTAINER_WIDTH - SIDEBAR_WIDTH, containerHeight, transformedMouseX, transformedMouseY);
-
-        if (eventHandler.isAnyColorPickerExpanded()) {
-            int colorPickerPanelX = containerX + containerWidth + 10;
-            colorPickerManager.renderColorPickerPanel(context, colorPickerPanelX, containerY, COLOR_PICKER_PANEL_WIDTH, containerHeight, transformedMouseX, transformedMouseY);
+        for (int ci = 0; ci < COLS.length; ci++) {
+            int cx = startX + ci * (COL_W + COL_GAP);
+            renderColumn(ctx, COLS[ci], cx, startY, mouseX, mouseY, alpha);
         }
 
-        renderHeader(context, containerX, containerY, containerWidth, transformedMouseX, transformedMouseY);
-
-        matrices.popMatrix();
-
-
-    }
-
-
-    private void renderHeader(DrawContext context, int x, int y, int width, int mouseX, int mouseY) {
-        int headerAlpha = (int) (animationManager.getGuiAnimation() * 255);
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-        context.fill(x, y, x + width, y + HEADER_HEIGHT, applyAlpha(theme.headerBg(), headerAlpha).getRGB());
-        String fullTitle = "RidhoXNoqwd";
-        int titleX = x + PADDING;
-        int titleY = y + 8;
-        int textAlpha = (int) (animationManager.getGuiAnimation() * 255);
-        Color titleColor = new Color(255, 255, 255, textAlpha);
-        var matrices = context.getMatrices();
-        matrices.pushMatrix();
-        matrices.translate(titleX, titleY);
-        matrices.scale(2.0f, 2.0f);
-        context.drawText(this.textRenderer, fullTitle, 0, 0, titleColor.getRGB(), false);
-        matrices.popMatrix();
-        int verX = titleX + this.textRenderer.getWidth(fullTitle) * 2 + 8;
-        int verY = titleY + 2;
-        Color versionColor = new Color(180, 180, 200, textAlpha);
-        context.drawText(this.textRenderer, RavenZClient.CLIENT_VERSION, verX, verY, versionColor.getRGB(), false);
-        Color creditColor = new Color(140, 140, 160, textAlpha);
-        context.drawText(this.textRenderer, "by RidhoXNoqwd", titleX, titleY + 18, creditColor.getRGB(), false);
-
-        renderSearchBar(context, x, y, width);
-    }
-
-    private void renderSearchBar(DrawContext context, int x, int y, int width) {
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-
-        int searchX = x + width - SEARCH_BAR_WIDTH - PADDING;
-        int searchY = y + (HEADER_HEIGHT - SEARCH_BAR_HEIGHT) / 2;
-
-        String displayText = eventHandler.getSearchQuery().isEmpty() ? "Search modules..." : eventHandler.getSearchQuery();
-    Color textColor = eventHandler.getSearchQuery().isEmpty() ? applyAlpha(theme.muted(), 180) : theme.text();
-        int textX = searchX + 8;
-        int textY = searchY + (SEARCH_BAR_HEIGHT - 12) / 2 + 2;
-
-        String clippedText = displayText;
-        float maxTextWidth = SEARCH_BAR_WIDTH - 16;
-        while (this.textRenderer.getWidth(clippedText) > maxTextWidth && clippedText.length() > 0) {
-            clippedText = clippedText.substring(0, clippedText.length() - 1);
+        if (openDropdown != null) {
+            renderDropdown(ctx, mouseX, mouseY, alpha);
         }
-    context.fill(searchX, searchY, searchX + SEARCH_BAR_WIDTH, (searchY + SEARCH_BAR_HEIGHT) - 2,
-        applyAlpha(theme.panelBg(), 220).getRGB());
-    context.drawText(this.textRenderer, clippedText, textX, textY - 3, textColor.getRGB(), false);
+    }
 
-        if (eventHandler.isSearchFocused() && !eventHandler.getSearchQuery().isEmpty()) {
-            long currentTime = System.currentTimeMillis();
-            if ((currentTime - lastCursorBlink) % 1000 < 500) {
-                int cursorX = textX + this.textRenderer.getWidth(clippedText);
-                context.fill(cursorX, textY - 1, cursorX + 1, textY + 11, theme.text().getRGB());
+    private void renderColumn(DrawContext ctx, Category cat, int cx, int cy,
+                              int mouseX, int mouseY, int alpha) {
+        List<Module> mods = filteredModules(cat);
+
+        int colH = HEADER_H + mods.size() * MOD_H;
+        if (openSettingsModule != null && openSettingsModule.getModuleCategory() == cat) {
+            colH += settingsHeight(openSettingsModule);
+        }
+
+        fill(ctx, cx, cy, cx + COL_W, cy + colH, applyA(COL_BG, alpha));
+        fill(ctx, cx, cy, cx + COL_W, cy + HEADER_H, applyA(HEADER_BG, alpha));
+        fill(ctx, cx, cy + HEADER_H - 1, cx + COL_W, cy + HEADER_H, applyA(HEADER_LINE, alpha));
+
+        String label = cat.getName();
+        int lw = textRenderer.getWidth(label);
+        ctx.drawText(textRenderer, label,
+            cx + (COL_W - lw) / 2, cy + (HEADER_H - 8) / 2,
+            applyA(WHITE_C, alpha).getRGB(), false);
+
+        int my = cy + HEADER_H;
+        for (Module mod : mods) {
+            boolean enabled = mod.isEnabled();
+            boolean hovered = inBox(mouseX, mouseY, cx, my, COL_W, MOD_H);
+            boolean isOpen  = mod == openSettingsModule;
+
+            if (hovered || isOpen) {
+                fill(ctx, cx, my, cx + COL_W, my + MOD_H, applyA(MOD_HOVER_BG, alpha));
+            }
+            if (enabled) {
+                fill(ctx, cx, my, cx + 3, my + MOD_H, applyA(MOD_ACTIVE_BAR, alpha));
+            }
+
+            Color tc = enabled ? applyA(MOD_ENABLED, alpha) : applyA(MOD_DISABLED, alpha);
+            ctx.drawText(textRenderer, mod.getName(), cx + 9, my + (MOD_H - 8) / 2,
+                tc.getRGB(), false);
+
+            if (hasSettings(mod)) {
+                String arrow = isOpen ? "v" : ">";
+                ctx.drawText(textRenderer, arrow,
+                    cx + COL_W - 14, my + (MOD_H - 8) / 2,
+                    applyA(MUTED_TEXT, alpha).getRGB(), false);
+            }
+
+            my += MOD_H;
+
+            if (isOpen) {
+                int sh = renderSettings(ctx, mod, cx, my, mouseX, mouseY, alpha);
+                my += sh;
             }
         }
     }
 
-    private void renderSidebar(DrawContext context, int x, int y, int height, int mouseX, int mouseY) {
-        int sidebarAlpha = (int) (animationManager.getGuiAnimation() * 255);
-    Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-    Color sb = applyAlpha(theme.sidebarBg(), sidebarAlpha);
-    context.fill(x, y + HEADER_HEIGHT, x + SIDEBAR_WIDTH, y + height - 12, sb.getRGB());
-    context.fill(x + 12, y + height - 12, x + SIDEBAR_WIDTH, y + height, sb.getRGB());
+    private int renderSettings(DrawContext ctx, Module mod, int sx, int sy,
+                               int mouseX, int mouseY, int alpha) {
+        List<Setting> settings = mod.getSettings();
+        if (settings == null || settings.isEmpty()) return 0;
+        int totalH = settings.size() * SETTING_H + 6;
 
-        int sidebarX = x;
-        int sidebarY = y + HEADER_HEIGHT;
+        fill(ctx, sx, sy, sx + COL_W, sy + totalH, applyA(SETTINGS_BG, alpha));
+        fill(ctx, sx, sy, sx + 3, sy + totalH, applyA(HEADER_LINE, alpha));
+        fill(ctx, sx, sy + totalH - 1, sx + COL_W, sy + totalH, applyA(HEADER_LINE, alpha));
 
-        int categoryY = sidebarY + PADDING;
-
-        for (Category category : Category.values()) {
-            boolean isSelected = category == eventHandler.getSelectedCategory();
-            boolean isHovered = mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH &&
-                    mouseY >= categoryY && mouseY <= categoryY + 35;
-
-            float targetAnimation = isSelected ? 1f : (isHovered ? 0.3f : 0f);
-            float currentAnimation = animationManager.getCategoryAnimation(category);
-            float newAnimation = MathHelper.lerp(0.15f, currentAnimation, targetAnimation);
-            animationManager.setCategoryAnimation(category, newAnimation);
-            Color textColor = isSelected ? Color.WHITE : new Color(190, 190, 190);
-            context.drawText(this.textRenderer, category.getName(), sidebarX + 20, categoryY + 13, textColor.getRGB(), false);
-
-            categoryY += 45;
+        int ry = sy + 3;
+        for (Setting s : settings) {
+            renderSetting(ctx, s, sx, ry, mouseX, mouseY, alpha);
+            ry += SETTING_H;
         }
+        return totalH;
     }
 
-    private void renderContent(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
-    Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-    int contentAlpha = (int) (animationManager.getGuiAnimation() * animationManager.getCategorySwitch() * 255);
-    Color panel = applyAlpha(theme.panelBg(), contentAlpha);
-    context.fill(x, y + HEADER_HEIGHT, x + width, y + height - 12, panel.getRGB());
-    context.fill(x, y + height - 12, x + width - 12, y + height, panel.getRGB());
+    private void renderSetting(DrawContext ctx, Setting s, int sx, int sy,
+                               int mouseX, int mouseY, int alpha) {
+        int nameMaxW = COL_W / 2 - 4;
+        String name  = truncate(s.getName(), nameMaxW);
+        int textY    = sy + (SETTING_H - 8) / 2;
+        ctx.drawText(textRenderer, name, sx + 8, textY,
+            applyA(MUTED_TEXT, alpha).getRGB(), false);
 
-        context.enableScissor(x, y + HEADER_HEIGHT, x + width, y + height);
+        int ctrlX = sx + COL_W / 2 + 2;
+        int ctrlW = COL_W / 2 - 10;
+        int ctrlY = sy + (SETTING_H - 12) / 2;
 
-        if (eventHandler.getSelectedCategory() == Category.CONFIG) {
-            renderConfigContent(context, x, y, width, height, mouseX, mouseY);
-        } else if (eventHandler.getSelectedCategory() == Category.CREDITS) {
-            renderCreditsContent(context, x, y, width, height, mouseX, mouseY);
-        } else {
-            renderModuleContent(context, x, y, width, height, mouseX, mouseY);
-        }
-
-        context.disableScissor();
-    }
-
-    private void renderModuleContent(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-
-        List<Module> allModules;
-        if (eventHandler.getSearchQuery().isEmpty()) {
-            allModules = RavenZClient.INSTANCE.getModuleManager().getModulesInCategory(eventHandler.getSelectedCategory());
-        } else {
-            allModules = RavenZClient.INSTANCE.getModuleManager().getModules();
-        }
-        List<Module> modules = filterModulesBySearch(allModules);
-
-        int moduleY = y + HEADER_HEIGHT + PADDING - eventHandler.getScrollOffset();
-        int totalContentHeight = PADDING;
-
-        for (Module module : modules) {
-            int moduleHeight = MODULE_HEIGHT + 5;
-            if (moduleExpanded.get(module)) {
-                moduleHeight += (int) (animationManager.getDropdownAnimation(module) * SettingsRenderer.getModuleSettingsHeight(module, SETTING_HEIGHT, eventHandler));
+        if (s instanceof BooleanSetting bs) {
+            boolean val = bs.getValue();
+            fill(ctx, ctrlX + ctrlW - 14, ctrlY + 1, ctrlX + ctrlW, ctrlY + 13,
+                applyA(val ? CHECK_ON : SLIDER_BG, alpha));
+            if (val) {
+                ctx.drawText(textRenderer, "x",
+                    ctrlX + ctrlW - 11, ctrlY + 3,
+                    applyA(WHITE_C, alpha).getRGB(), false);
             }
-
-            totalContentHeight += moduleHeight;
-
-            if (moduleY + moduleHeight < y + HEADER_HEIGHT) {
-                moduleY += moduleHeight;
-                continue;
-            }
-
-            if (moduleY > y + height) break;
-
-            boolean isHovered = mouseX >= x + PADDING && mouseX <= x + width - PADDING &&
-                    mouseY >= moduleY && mouseY <= moduleY + MODULE_HEIGHT;
-            boolean isEnabled = module.isEnabled();
-            boolean hasSettings = module.getSettings() != null && !module.getSettings().isEmpty();
-
-            float targetAnimation = isEnabled ? 1f : (isHovered ? 0.2f : 0f);
-            float currentAnimation = animationManager.getModuleAnimation(module);
-            float newAnimation = MathHelper.lerp(0.12f, currentAnimation, targetAnimation);
-            animationManager.setModuleAnimation(module, newAnimation);
-
-            float targetDropdown = moduleExpanded.get(module) ? 1f : 0f;
-            float currentDropdown = animationManager.getDropdownAnimation(module);
-            float newDropdown = MathHelper.lerp(0.15f, currentDropdown, targetDropdown);
-            animationManager.setDropdownAnimation(module, newDropdown);
-
-            Color bgColor = isHovered ? applyAlpha(theme.panelAltBg(), 220) : applyAlpha(theme.panelBg(), 140);
-        context.fill(x + PADDING, moduleY, x + width - PADDING, moduleY + MODULE_HEIGHT, bgColor.getRGB());
-        UIRenderer.renderBorder(context, x + PADDING, moduleY, width - PADDING * 2, MODULE_HEIGHT, applyAlpha(theme.muted(), 120).getRGB());
-            int indicatorAlpha = isEnabled ? (int) (newAnimation * 255) : 0;
-            if (indicatorAlpha > 0) {
-                Color indicator = applyAlpha(theme.accent(), indicatorAlpha);
-                context.fill(x + PADDING, moduleY, x + PADDING + 4, moduleY + MODULE_HEIGHT, indicator.getRGB());
-            }
-            Color textColor = isEnabled ? theme.text() : theme.muted();
-            context.drawText(this.textRenderer, module.getName(), x + PADDING + 10, moduleY + 8, textColor.getRGB(), false);
-            if (hasSettings) {
-                UIRenderer.renderDropdownArrow(context, x + width - PADDING - 30, moduleY + MODULE_HEIGHT / 2,
-                        moduleExpanded.get(module), theme.muted());
-            }
-
-            if (module.getDescription() != null && !module.getDescription().isEmpty()) {
-                float maxDescWidth = width - PADDING * 2 - 20 - (hasSettings ? 40 : 0);
-                String desc = module.getDescription();
-                if (smallFont.getStringWidth(desc) > maxDescWidth) {
-                    while (smallFont.getStringWidth(desc + "...") > maxDescWidth && desc.length() > 1) {
-                        desc = desc.substring(0, desc.length() - 1);
-                    }
-                    desc += "...";
-                }
-                context.drawText(this.textRenderer, desc, x + PADDING + 10, moduleY + 28, theme.muted().getRGB(), false);
-            }
-
-            moduleY += MODULE_HEIGHT + 5;
-
-            if (hasSettings && newDropdown > 0.05f) {
-                int settingsHeight = renderModuleSettings(context, module, x, moduleY, width, newDropdown);
-                moduleY += (int) (newDropdown * settingsHeight);
+        } else if (s instanceof NumberSetting ns) {
+            fill(ctx, ctrlX, ctrlY + 3, ctrlX + ctrlW, ctrlY + 9, applyA(SLIDER_BG, alpha));
+            double pct = (ns.getValue() - ns.getMin()) / (ns.getMax() - ns.getMin());
+            int fillW = (int)(pct * ctrlW);
+            if (fillW > 0) fill(ctx, ctrlX, ctrlY + 3, ctrlX + fillW, ctrlY + 9, applyA(SLIDER_FILL, alpha));
+            String val = formatDouble(ns.getValue());
+            int vw = textRenderer.getWidth(val);
+            ctx.drawText(textRenderer, val,
+                ctrlX + (ctrlW - vw) / 2, ctrlY - 1,
+                applyA(ACCENT_TEXT, alpha).getRGB(), false);
+        } else if (s instanceof ModeSetting ms) {
+            String mode = ms.getMode();
+            int mw = textRenderer.getWidth(mode);
+            fill(ctx, ctrlX, ctrlY, ctrlX + ctrlW, ctrlY + 14, applyA(SLIDER_BG, alpha));
+            boolean hov = inBox(mouseX, mouseY, ctrlX, ctrlY, ctrlW, 14);
+            ctx.drawText(textRenderer, mode,
+                ctrlX + (ctrlW - mw) / 2, ctrlY + 3,
+                applyA(hov ? WHITE_C : ACCENT_TEXT, alpha).getRGB(), false);
+        } else if (s instanceof KeybindSetting ks) {
+            boolean listening = ks == listeningKeybind;
+            String keyText = listening ? "..." : (ks.getKeyCode() < 0 ? "NONE" : KeyUtils.getKey(ks.getKeyCode()));
+            int kw = textRenderer.getWidth(keyText);
+            fill(ctx, ctrlX, ctrlY, ctrlX + ctrlW, ctrlY + 14, applyA(SLIDER_BG, alpha));
+            Color kc = listening ? applyA(new Color(255, 200, 80, 255), alpha) : applyA(ACCENT_TEXT, alpha);
+            ctx.drawText(textRenderer, keyText,
+                ctrlX + (ctrlW - kw) / 2, ctrlY + 3, kc.getRGB(), false);
+        } else if (s instanceof ColorSetting cs) {
+            Color col = cs.getValue();
+            if (col != null) {
+                fill(ctx, ctrlX, ctrlY, ctrlX + ctrlW, ctrlY + 14,
+                    new Color(col.getRed(), col.getGreen(), col.getBlue(), Math.min(alpha, 200)));
             }
         }
-
-        totalContentHeight += PADDING;
-        int visibleHeight = height - HEADER_HEIGHT;
-        eventHandler.updateMaxScrollOffset(totalContentHeight, visibleHeight);
     }
 
-    private void renderCreditsContent(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-        int currentY = y + HEADER_HEIGHT + PADDING;
-
-        context.drawText(this.textRenderer, "Credits", x + PADDING, currentY, theme.text().getRGB(), false);
-        currentY += 35;
-
-        context.fill(x + PADDING, currentY, x + width - PADDING, currentY + 1, applyAlpha(theme.muted(), 80).getRGB());
-        currentY += 15;
-
-        context.fill(x + PADDING, currentY, x + width - PADDING, currentY + 55, applyAlpha(theme.panelBg(), 200).getRGB());
-        UIRenderer.renderBorder(context, x + PADDING, currentY, width - PADDING * 2, 55, applyAlpha(theme.accent(), 120).getRGB());
-        context.fill(x + PADDING, currentY, x + PADDING + 4, currentY + 55, applyAlpha(theme.accent(), 200).getRGB());
-
-        context.drawText(this.textRenderer, "3xecutablefile / RidhoXNoqwd", x + PADDING + 14, currentY + 10, theme.text().getRGB(), false);
-        context.drawText(this.textRenderer, "creator", x + PADDING + 14, currentY + 30, applyAlpha(theme.muted(), 200).getRGB(), false);
-    }
-
-    private void renderConfigContent(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
-        int startY = y + HEADER_HEIGHT + PADDING - eventHandler.getScrollOffset();
-        int currentY = startY;
-
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-    context.drawText(this.textRenderer, "Config Manager", x + PADDING, currentY, theme.text().getRGB(), false);
-        currentY += 50;
-
-        context.fill(x + PADDING, currentY, x + width - PADDING, currentY + 30, applyAlpha(theme.panelBg(), 200).getRGB());
-        String displayText = configName.isEmpty() ? "Enter config name..." : configName;
-        Color textColor = configName.isEmpty() ? applyAlpha(theme.muted(), 180) : theme.text();
-        context.drawText(this.textRenderer, displayText, x + PADDING + 8, currentY + 10, textColor.getRGB(), false);
-
-        if (configNameFocused && !configName.isEmpty()) {
-            long currentTime = System.currentTimeMillis();
-            if ((currentTime - lastCursorBlink) % 1000 < 500) {
-                int cursorX = x + PADDING + 8 + this.textRenderer.getWidth(configName);
-                context.fill(cursorX, currentY + 6, cursorX + 1, currentY + 24, Color.WHITE.getRGB());
-            }
+    private void renderDropdown(DrawContext ctx, int mouseX, int mouseY, int alpha) {
+        List<String> modes = openDropdown.getModes();
+        int dh = modes.size() * 16 + 4;
+        fill(ctx, dropdownX, dropdownY, dropdownX + dropdownW, dropdownY + dh, applyA(DROP_BG, alpha));
+        int ry = dropdownY + 2;
+        for (String mode : modes) {
+            boolean hov = inBox(mouseX, mouseY, dropdownX, ry, dropdownW, 16);
+            boolean sel = mode.equals(openDropdown.getMode());
+            if (hov || sel) fill(ctx, dropdownX, ry, dropdownX + dropdownW, ry + 16, applyA(MOD_HOVER_BG, alpha));
+            ctx.drawText(textRenderer, mode, dropdownX + 6, ry + 4,
+                applyA(sel ? WHITE_C : MUTED_TEXT, alpha).getRGB(), false);
+            ry += 16;
         }
-        currentY += 40;
-
-    renderConfigButton(context, x + PADDING, currentY, 80, 25, "Save", theme.accent(), mouseX, mouseY);
-    renderConfigButton(context, x + PADDING + 90, currentY, 80, 25, "Load", applyAlpha(theme.panelAltBg(), 200), mouseX, mouseY);
-    renderConfigButton(context, x + PADDING + 180, currentY, 80, 25, "Delete", new Color(200, 80, 80), mouseX, mouseY);
-        currentY += 40;
-
-        context.drawText(this.textRenderer, "Available Configs:", x + PADDING, currentY, new Color(180, 180, 180).getRGB(), false);
-        currentY += 25;
-
-        for (String config : configs) {
-            boolean isHovered = mouseX >= x + PADDING && mouseX <= x + width - PADDING &&
-                    mouseY >= currentY && mouseY <= currentY + 25;
-            boolean isSelected = config.equals(selectedConfig);
-
-        Color bgColor = isSelected ? applyAlpha(theme.accent(), 170) : (isHovered ? applyAlpha(theme.panelAltBg(), 160) : applyAlpha(theme.panelBg(), 120));
-        context.fill(x + PADDING, currentY, x + width - PADDING, currentY + 25, bgColor.getRGB());
-
-        Color itemTextColor = isSelected ? theme.text() : theme.muted();
-        context.drawText(this.textRenderer, config, x + PADDING + 8, currentY + 8, itemTextColor.getRGB(), false);
-
-            currentY += 30;
-        }
-
-        int totalContentHeight = currentY - startY + PADDING;
-        int visibleHeight = height - HEADER_HEIGHT;
-        eventHandler.updateMaxScrollOffset(totalContentHeight, visibleHeight);
-    }
-
-    private void renderConfigButton(DrawContext context, int x, int y, int width, int height, String text, Color baseColor, int mouseX, int mouseY) {
-        boolean isHovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
-        Color buttonColor;
-        if (isHovered) {
-            int r = Math.max(0, Math.min(255, baseColor.getRed() + 20));
-            int g = Math.max(0, Math.min(255, baseColor.getGreen() + 20));
-            int b = Math.max(0, Math.min(255, baseColor.getBlue() + 20));
-            int a = baseColor.getAlpha();
-            buttonColor = new Color(r, g, b, a);
-        } else {
-            buttonColor = baseColor;
-        }
-        context.fill(x, y, x + width, y + height, buttonColor.getRGB());
-
-        int textX = x + (width - this.textRenderer.getWidth(text)) / 2;
-        int textY = y + (height - 8) / 2;
-        Theme theme = ThemeManager.getTheme(ClickGUIModule.theme.getMode());
-        context.drawText(this.textRenderer, text, textX, textY, theme.text().getRGB(), false);
-    }
-
-    private List<Module> filterModulesBySearch(List<Module> modules) {
-        return SearchUtils.filterModulesBySearch(modules, eventHandler.getSearchQuery());
-    }
-
-    private int renderModuleSettings(DrawContext context, Module module, int x, int moduleY, int width, float animation) {
-        return SettingsRenderer.renderModuleSettings(context, module, x, moduleY, width, animation, smallFont, eventHandler.getDropdownExpanded(), eventHandler);
-    }
-
-    private boolean handleColorPickerClicks(double mouseX, double mouseY, int button) {
-        return colorPickerManager.handleColorPickerClicks(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseClicked(Click click, boolean doubleClick) {
-        double mouseX = click.x();
-        double mouseY = click.y();
-        int button = click.button();
-        if (button < 0 || button > 8) return false;
+        double mx = click.x(), my = click.y();
+        int btn = click.button();
+        if (btn < 0 || btn > 8) return false;
 
-        float finalScale = Math.max(0.05f, animationManager.getScaleAnimation() * getGuiScaleMultiplier());
-        float centerX = width / 2f;
-        float centerY = height / 2f;
-        double transformedMouseX = (mouseX - centerX) / finalScale + centerX;
-        double transformedMouseY = (mouseY - centerY) / finalScale + centerY;
-
-        if (eventHandler.getSelectedCategory() == Category.CONFIG && handleConfigClick(transformedMouseX, transformedMouseY, button)) {
+        if (openDropdown != null) {
+            if (handleDropdownClick(mx, my)) return true;
+            openDropdown = null;
             return true;
         }
 
-        if (handleColorPickerClicks(transformedMouseX, transformedMouseY, button)) {
+        if (listeningKeybind != null) {
+            listeningKeybind.setKeyCode(-100 - btn);
+            listeningKeybind.setListening(false);
+            listeningKeybind = null;
             return true;
         }
 
-        List<Module> allModules;
-        if (eventHandler.getSearchQuery().isEmpty()) {
-            allModules = RavenZClient.INSTANCE.getModuleManager().getModulesInCategory(eventHandler.getSelectedCategory());
-        } else {
-            allModules = RavenZClient.INSTANCE.getModuleManager().getModules();
-        }
-        List<Module> modules = filterModulesBySearch(allModules);
+        int numCols = COLS.length;
+        int totalW  = numCols * COL_W + (numCols - 1) * COL_GAP;
+        int startX  = Math.max(PANEL_PAD, (width - totalW) / 2);
+        int startY  = PANEL_PAD - scrollOffset;
 
-        return eventHandler.handleMouseClick(transformedMouseX, transformedMouseY, button, width, height, modules) ||
-                super.mouseClicked(click, doubleClick);
+        for (int ci = 0; ci < COLS.length; ci++) {
+            Category cat = COLS[ci];
+            int cx = startX + ci * (COL_W + COL_GAP);
+            if (mx < cx || mx > cx + COL_W) continue;
+
+            List<Module> mods = filteredModules(cat);
+            int rowY = startY + HEADER_H;
+
+            for (Module mod : mods) {
+                if (mod == openSettingsModule) {
+                    int sh = settingsHeight(mod);
+                    if (my >= rowY + MOD_H && my < rowY + MOD_H + sh) {
+                        handleSettingClick(mx, my, mod, cx, rowY + MOD_H);
+                        return true;
+                    }
+                }
+                if (my >= rowY && my < rowY + MOD_H) {
+                    if (btn == 1) {
+                        if (hasSettings(mod)) {
+                            openSettingsModule = (mod == openSettingsModule) ? null : mod;
+                            openDropdown = null;
+                        }
+                    } else {
+                        mod.toggle();
+                    }
+                    return true;
+                }
+                rowY += MOD_H;
+                if (mod == openSettingsModule) rowY += settingsHeight(mod);
+            }
+        }
+
+        return super.mouseClicked(click, doubleClick);
+    }
+
+    private boolean handleDropdownClick(double mx, double my) {
+        if (openDropdown == null) return false;
+        List<String> modes = openDropdown.getModes();
+        int dh = modes.size() * 16 + 4;
+        if (!inBox(mx, my, dropdownX, dropdownY, dropdownW, dh)) return false;
+        int ry = dropdownY + 2;
+        for (String mode : modes) {
+            if (my >= ry && my < ry + 16) {
+                openDropdown.setMode(mode);
+                openDropdown = null;
+                return true;
+            }
+            ry += 16;
+        }
+        return false;
+    }
+
+    private void handleSettingClick(double mx, double my, Module mod, int sx, int sy) {
+        List<Setting> settings = mod.getSettings();
+        if (settings == null) return;
+
+        int ctrlX = sx + COL_W / 2 + 2;
+        int ctrlW = COL_W / 2 - 10;
+        int ry = sy + 3;
+
+        for (Setting s : settings) {
+            int ctrlY = ry + (SETTING_H - 12) / 2;
+
+            if (s instanceof BooleanSetting bs) {
+                if (inBox(mx, my, ctrlX + ctrlW - 14, ctrlY + 1, 14, 12)) {
+                    bs.toggle();
+                    return;
+                }
+            } else if (s instanceof NumberSetting ns) {
+                if (inBox(mx, my, ctrlX, ctrlY + 3, ctrlW, 9)) {
+                    double pct = Math.max(0, Math.min(1, (mx - ctrlX) / ctrlW));
+                    ns.setValue(ns.getMin() + pct * (ns.getMax() - ns.getMin()));
+                    draggingSlider = ns;
+                    sliderTrackX   = ctrlX;
+                    sliderTrackW   = ctrlW;
+                    return;
+                }
+            } else if (s instanceof ModeSetting ms) {
+                if (inBox(mx, my, ctrlX, ctrlY, ctrlW, 14)) {
+                    if (openDropdown == ms) {
+                        openDropdown = null;
+                    } else {
+                        openDropdown = ms;
+                        dropdownX    = ctrlX;
+                        dropdownY    = ry + SETTING_H;
+                        dropdownW    = ctrlW;
+                    }
+                    return;
+                }
+            } else if (s instanceof KeybindSetting ks) {
+                if (inBox(mx, my, ctrlX, ctrlY, ctrlW, 14)) {
+                    if (listeningKeybind != null) listeningKeybind.setListening(false);
+                    listeningKeybind = ks;
+                    ks.setListening(true);
+                    return;
+                }
+            }
+
+            ry += SETTING_H;
+        }
     }
 
     @Override
     public boolean mouseDragged(Click click, double deltaX, double deltaY) {
-        double mouseX = click.x();
-        double mouseY = click.y();
-        int button = click.button();
-        float finalScale = Math.max(0.05f, animationManager.getScaleAnimation() * getGuiScaleMultiplier());
-        float centerX = width / 2f;
-        float centerY = height / 2f;
-        double transformedMouseX = (mouseX - centerX) / finalScale + centerX;
-        double transformedMouseY = (mouseY - centerY) / finalScale + centerY;
-
-        if (colorPickerManager.handleColorPickerDrag(transformedMouseX, transformedMouseY, button, deltaX, deltaY)) {
+        if (draggingSlider != null && click.button() == 0) {
+            double pct = Math.max(0, Math.min(1, (click.x() - sliderTrackX) / (double) sliderTrackW));
+            draggingSlider.setValue(draggingSlider.getMin() + pct * (draggingSlider.getMax() - draggingSlider.getMin()));
             return true;
         }
-
-        return eventHandler.handleMouseDrag(transformedMouseX, transformedMouseY, button, deltaX, deltaY, width, height);
+        return false;
     }
 
     @Override
     public boolean mouseReleased(Click click) {
-        double mouseX = click.x();
-        double mouseY = click.y();
-        int button = click.button();
-        float finalScale = Math.max(0.05f, animationManager.getScaleAnimation() * getGuiScaleMultiplier());
-        float centerX = width / 2f;
-        float centerY = height / 2f;
-        double transformedMouseX = (mouseX - centerX) / finalScale + centerX;
-        double transformedMouseY = (mouseY - centerY) / finalScale + centerY;
-
-        if (colorPickerManager.handleColorPickerRelease(transformedMouseX, transformedMouseY, button)) {
-            return true;
-        }
-
-        return eventHandler.handleMouseRelease(transformedMouseX, transformedMouseY, button);
+        if (click.button() == 0) draggingSlider = null;
+        return false;
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        float finalScale = Math.max(0.05f, animationManager.getScaleAnimation() * getGuiScaleMultiplier());
-        float centerX = width / 2f;
-        float centerY = height / 2f;
-        double transformedMouseX = (mouseX - centerX) / finalScale + centerX;
-        double transformedMouseY = (mouseY - centerY) / finalScale + centerY;
-
-        return eventHandler.handleMouseScroll(transformedMouseX, transformedMouseY, horizontalAmount, verticalAmount, height) ||
-                super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    public boolean mouseScrolled(double mouseX, double mouseY, double hAmt, double vAmt) {
+        scrollOffset = Math.max(0, Math.min(maxScrollOffset, (int)(scrollOffset - vAmt * 15)));
+        return true;
     }
 
     @Override
     public boolean keyPressed(KeyInput input) {
-        int keyCode = input.key();
-        int scanCode = input.scancode();
-        int modifiers = input.modifiers();
+        int key = input.key();
 
-        if (configNameFocused) {
-            if (keyCode == GLFW.GLFW_KEY_ENTER) {
-                saveConfig();
-                configNameFocused = false;
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-                if (!configName.isEmpty()) {
-                    configName = configName.substring(0, configName.length() - 1);
-                }
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                configNameFocused = false;
-                return true;
+        if (listeningKeybind != null) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                listeningKeybind.setKeyCode(-1);
+            } else {
+                listeningKeybind.setKeyCode(key);
             }
-        }
-
-        if (colorPickerManager.handleColorPickerKeyPress(keyCode)) {
-            return true;
-        }
-        if (eventHandler.handleKeyPress(keyCode, scanCode, modifiers)) {
+            listeningKeybind.setListening(false);
+            listeningKeybind = null;
             return true;
         }
 
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            lastSelectedCategory = eventHandler.getSelectedCategory();
-            lastScrollOffset = eventHandler.getScrollOffset();
-            lastModuleExpanded.clear();
-            lastModuleExpanded.putAll(moduleExpanded);
+        if (openDropdown != null && key == GLFW.GLFW_KEY_ESCAPE) {
+            openDropdown = null;
+            return true;
+        }
+
+        if (key == GLFW.GLFW_KEY_BACKSPACE && !searchQuery.isEmpty()) {
+            searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+            return true;
+        }
+
+        if (key == GLFW.GLFW_KEY_ESCAPE) {
             close();
             return true;
         }
@@ -558,16 +446,12 @@ public final class ClickGui extends Screen {
 
     @Override
     public boolean charTyped(CharInput input) {
-        char chr = (char) input.codepoint();
-        int modifiers = input.modifiers();
-        if (configNameFocused && chr >= 32 && chr < 127) {
-            if (configName.length() < 20) {
-                configName += chr;
-            }
+        char c = (char) input.codepoint();
+        if (c >= 32 && c < 127 && searchQuery.length() < 30) {
+            searchQuery += c;
             return true;
         }
-        if (colorPickerManager.handleColorPickerCharTyped(chr)) return true;
-        return eventHandler.handleCharTyped(chr, modifiers) || super.charTyped(input);
+        return false;
     }
 
     @Override
@@ -575,99 +459,53 @@ public final class ClickGui extends Screen {
         animationManager.startClosingAnimation();
     }
 
-    private void loadConfigs() {
-        configs.clear();
-        File profileDir = RavenZClient.INSTANCE.getProfileManager().getProfileDir();
-        if (profileDir.exists() && profileDir.isDirectory()) {
-            File[] files = profileDir.listFiles((dir, name) -> name.endsWith(".json"));
-            if (files != null) {
-                for (File file : files) {
-                    configs.add(file.getName().replace(".json", ""));
-                }
-            }
+    // ─── Helpers ────────────────────────────────────────────────────────────
+
+    private List<Module> filteredModules(Category cat) {
+        List<Module> all = RavenZClient.INSTANCE.getModuleManager().getModulesInCategory(cat);
+        if (searchQuery.isEmpty()) return all;
+        String q = searchQuery.toLowerCase();
+        List<Module> out = new ArrayList<>();
+        for (Module m : all) {
+            if (m.getName().toLowerCase().contains(q)) out.add(m);
         }
+        return out;
     }
 
-    private static Color applyAlpha(Color base, int alpha) {
-        int a = Math.max(0, Math.min(255, alpha));
+    private boolean hasSettings(Module mod) {
+        List<Setting> s = mod.getSettings();
+        return s != null && !s.isEmpty();
+    }
+
+    private int settingsHeight(Module mod) {
+        List<Setting> s = mod.getSettings();
+        if (s == null || s.isEmpty()) return 0;
+        return s.size() * SETTING_H + 6;
+    }
+
+    private boolean inBox(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    private void fill(DrawContext ctx, int x1, int y1, int x2, int y2, Color c) {
+        if (x2 <= x1 || y2 <= y1) return;
+        ctx.fill(x1, y1, x2, y2, c.getRGB());
+    }
+
+    private Color applyA(Color base, int alpha) {
+        int a = Math.max(0, Math.min(255, (base.getAlpha() * alpha) / 255));
         return new Color(base.getRed(), base.getGreen(), base.getBlue(), a);
     }
 
-    private boolean handleConfigClick(double mouseX, double mouseY, int button) {
-        int screenWidth = width;
-        int screenHeight = height;
-        int containerX = (screenWidth - CONTAINER_WIDTH) / 2;
-        int containerY = (screenHeight - 500) / 2;
-        int contentX = containerX + SIDEBAR_WIDTH;
-        int contentY = containerY + HEADER_HEIGHT + PADDING - eventHandler.getScrollOffset();
-
-        int inputY = contentY + 50;
-        if (mouseY >= inputY && mouseY <= inputY + 30) {
-            configNameFocused = true;
-            return true;
-        }
-
-        int buttonY = inputY + 40;
-        if (mouseY >= buttonY && mouseY <= buttonY + 25) {
-            if (mouseX >= contentX + PADDING && mouseX <= contentX + PADDING + 80) {
-                saveConfig();
-                return true;
-            } else if (mouseX >= contentX + PADDING + 90 && mouseX <= contentX + PADDING + 170) {
-                loadConfig();
-                return true;
-            } else if (mouseX >= contentX + PADDING + 180 && mouseX <= contentX + PADDING + 260) {
-                deleteConfig();
-                return true;
-            }
-        }
-
-        int listY = buttonY + 65;
-        for (String config : configs) {
-            if (mouseY >= listY && mouseY <= listY + 25) {
-                selectedConfig = config;
-                configName = config;
-                return true;
-            }
-            listY += 30;
-        }
-
-        configNameFocused = false;
-        return false;
+    private String formatDouble(double v) {
+        if (v == Math.floor(v) && !Double.isInfinite(v)) return String.valueOf((int) v);
+        return String.format("%.2f", v);
     }
 
-    private void saveConfig() {
-        if (!configName.trim().isEmpty()) {
-            RavenZClient.INSTANCE.getProfileManager().saveProfile(configName.trim(), true);
-            loadConfigs();
-            selectedConfig = configName.trim();
-        }
-    }
-
-    private void loadConfig() {
-        if (!selectedConfig.isEmpty()) {
-            RavenZClient.INSTANCE.getProfileManager().loadProfile(selectedConfig);
-        }
-    }
-
-    private void deleteConfig() {
-        if (!selectedConfig.isEmpty()) {
-            File configFile = new File(RavenZClient.INSTANCE.getProfileManager().getProfileDir(), selectedConfig + ".json");
-            if (configFile.exists() && configFile.delete()) {
-                loadConfigs();
-                selectedConfig = "";
-                configName = "";
-            }
-        }
-    }
-
-    private float getGuiScaleMultiplier() {
-        int scaleValue = com.raven.ravenz.module.modules.client.ClientSettingsModule.getGuiScale();
-        switch (scaleValue) {
-            case 0: return 0.75f;  
-            case 1: return 1.0f;   
-            case 2: return 1.25f;  
-            case 3: return 1.5f;   
-            default: return 1.0f;
-        }
+    private String truncate(String s, int maxW) {
+        if (textRenderer.getWidth(s) <= maxW) return s;
+        while (s.length() > 1 && textRenderer.getWidth(s + "..") > maxW)
+            s = s.substring(0, s.length() - 1);
+        return s + "..";
     }
 }

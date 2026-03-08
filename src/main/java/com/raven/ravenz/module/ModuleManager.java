@@ -89,7 +89,7 @@ public final class ModuleManager {
         add(
                 new CartKey(), new HoverTotem(), new MiddleClickFriend(),
                 new PearlKey(), new PearlCatch(), new WindChargeKey(), new Teams(), new FakePlayer(),
-                new Friends());
+                new Friends(), new AsmrKeyboard(), new DoubleAnchor(), new SafeAnchorAuto(), new MaceTarget());
 
         // Client
         add(new ClickGUIModule(), new NewClickGUIModule(), new RichModernGUIModule(), new ClientSettingsModule(), new Client(), new Debugger(),

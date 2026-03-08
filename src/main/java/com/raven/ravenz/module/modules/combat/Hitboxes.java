@@ -21,7 +21,7 @@ public class Hitboxes extends Module {
             "Expand Mode", "Blatant", "Blatant", "Legit");
 
     // ── Target selection ───────────────────────────────────────────────────
-    private final BooleanSetting onlyWeapon    = new BooleanSetting("Only Weapon",    false);
+    private final BooleanSetting onlyWeapon     = new BooleanSetting("Only Weapon",    false);
     private final BooleanSetting targetCrystals = new BooleanSetting("Target Crystals", false);
 
     // ── Per-weapon expansion ───────────────────────────────────────────────
@@ -32,10 +32,15 @@ public class Hitboxes extends Module {
     private final NumberSetting expandAmount   = new NumberSetting("Expand Amount",   0.0, 1.0, 0.1, 0.01);
     private final NumberSetting crystalExpand  = new NumberSetting("Crystal Expand",  0.0, 1.0, 0.3, 0.01);
 
+    // ── Reach ──────────────────────────────────────────────────────────────
+    private final BooleanSetting reachEnabled  = new BooleanSetting("Reach",          false);
+    private final NumberSetting  reachExpand   = new NumberSetting("Reach Expand",    0.0, 6.0, 0.5, 0.05);
+
     public Hitboxes() {
         super("Hitboxes", "Expands the hitboxes of other players and end crystals", -1, Category.COMBAT);
         addSettings(mode, onlyWeapon, targetCrystals,
-                swordExpand, axeExpand, maceExpand, tridentExpand, expandAmount, crystalExpand);
+                swordExpand, axeExpand, maceExpand, tridentExpand, expandAmount, crystalExpand,
+                reachEnabled, reachExpand);
     }
 
     /**
@@ -69,6 +74,12 @@ public class Hitboxes extends Module {
     /** True when Blatant mode: expands all three axes uniformly. */
     public boolean isBlatant() {
         return mode.isMode("Blatant");
+    }
+
+    /** Returns extra reach to add when Reach is enabled, or 0 if disabled. */
+    public double getReachExpand() {
+        if (!isEnabled() || !reachEnabled.getValue()) return 0;
+        return reachExpand.getValue();
     }
 
     /** Convenience accessor for EntityMixin. */

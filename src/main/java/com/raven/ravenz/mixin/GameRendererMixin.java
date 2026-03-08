@@ -2,6 +2,7 @@ package com.raven.ravenz.mixin;
 
 import com.raven.ravenz.RavenZClient;
 import com.raven.ravenz.event.impl.render.Render3DEvent;
+import com.raven.ravenz.module.modules.combat.Hitboxes;
 import com.raven.ravenz.module.modules.render.AspectRatio;
 import com.raven.ravenz.utils.render.W2SUtil;
 import com.raven.ravenz.utils.render.font.util.RendererUtils;
@@ -16,6 +17,7 @@ import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
@@ -97,5 +99,26 @@ public class GameRendererMixin {
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    /**
+     * Extends entity interaction range (reach) for the crosshair target raytrace
+     * when the Hitboxes module has Reach enabled.
+     *
+     * findCrosshairTarget(Entity camera, double blockInteractionRange, double entityInteractionRange, float tickDelta)
+     * index 2 = entityInteractionRange
+     */
+    @ModifyArg(
+        method = "render",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/render/GameRenderer;findCrosshairTarget(Lnet/minecraft/entity/Entity;DDf)Lnet/minecraft/util/hit/HitResult;"
+        ),
+        index = 2
+    )
+    private double modifyEntityInteractionRange(double entityInteractionRange) {
+        Hitboxes hitboxes = Hitboxes.getInstance();
+        if (hitboxes == null) return entityInteractionRange;
+        return entityInteractionRange + hitboxes.getReachExpand();
     }
 }

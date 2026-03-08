@@ -824,7 +824,7 @@ public class RavenScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyInput input) {
-        int keyCode = input.getKeycode();
+        int keyCode = input.key();
 
         if (listeningKeybind != null) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
