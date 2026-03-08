@@ -55,7 +55,7 @@ public final class AutoDoubleHand extends Module {
 
         // ── On Pop: offhand had a totem, now it doesn't ───────────────────
         if (onPop.getValue()) {
-            boolean hasOffhandTotem = inventory.offhand.get(0).isOf(Items.TOTEM_OF_UNDYING);
+            boolean hasOffhandTotem = mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING);
             if (!hasOffhandTotem && !offhandPopped) {
                 offhandPopped = true;
                 InventoryUtil.swapToSlot(Items.TOTEM_OF_UNDYING);

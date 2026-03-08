@@ -118,7 +118,7 @@ public final class AutoInventoryTotem extends Module {
         boolean didAction = false;
 
         // Fill offhand
-        if (fillOffhand.getValue() && !inv.offhand.get(0).isOf(Items.TOTEM_OF_UNDYING)) {
+        if (fillOffhand.getValue() && !mc.player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
             int slot = findTotemSlot();
             if (slot != -1) {
                 mc.interactionManager.clickSlot(syncId, slot, 40, SlotActionType.SWAP, mc.player);
