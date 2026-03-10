@@ -32,10 +32,18 @@ import java.util.Random;
 
 public final class KeyCrystal extends Module {
 
-    private final KeybindSetting crystalKeybind = new KeybindSetting("Crystal Key", GLFW.GLFW_MOUSE_BUTTON_4, false);
+    private final KeybindSetting crystalKeybind = new KeybindSetting("Crystal Key", GLFW.GLFW_MOUSE_BUTTON_5, false);
     private final BooleanSetting antiSuicide = new BooleanSetting("Anti Suicide", true);
     private final BooleanSetting antiWeakness = new BooleanSetting("Anti Weakness", true);
     private final BooleanSetting stopOnKill = new BooleanSetting("Stop On Kill", false);
+
+    // Restore slot settings
+    private final BooleanSetting restoreToTotem = new BooleanSetting("Restore To Totem", true);
+    private final NumberSetting totemSlot = new NumberSetting("Totem Slot", 1, 9, 8, 1);
+
+    // Explode slot settings
+    private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
+    private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 8, 1);
 
     private final NumberSetting placeChance = new NumberSetting("Place Chance (%)", 0, 100, 100, 1);
     private final NumberSetting breakChance = new NumberSetting("Break Chance (%)", 0, 100, 100, 1);
@@ -63,7 +71,9 @@ public final class KeyCrystal extends Module {
                 crystalKeybind,
                 placeChance, breakChance, stopOnKill,
                 minBreakDelay, maxBreakDelay, minPlaceDelay, maxPlaceDelay,
-                antiSuicide, antiWeakness
+                antiSuicide, antiWeakness,
+                restoreToTotem, totemSlot,
+                useExplodeSlot, explodeSlot
         );
 
         this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(crystalKeybind));
@@ -98,11 +108,36 @@ public final class KeyCrystal extends Module {
 
     private void stopCrystalPvP() {
         if (!isActive) return;
-        if (originalSlot != -1) mc.player.getInventory().selectedSlot = originalSlot;
+        restoreSlot();
         isActive = false;
         originalSlot = -1;
         hasPlacedObsidian = false;
         resetDelays();
+    }
+
+    /**
+     * Restore slot logic:
+     * - Restore To Totem ON  → switch to configured totem slot (1-9)
+     * - Restore To Totem OFF → restore to the slot that was active before key was held
+     */
+    private void restoreSlot() {
+        if (mc.player == null) return;
+        if (restoreToTotem.getValue()) {
+            mc.player.getInventory().selectedSlot = totemSlot.getValueInt() - 1;
+        } else if (originalSlot != -1) {
+            mc.player.getInventory().selectedSlot = originalSlot;
+        }
+    }
+
+    /**
+     * Explode slot logic:
+     * - Use Explode Slot ON  → switch to configured explode slot before attacking
+     * - Use Explode Slot OFF → no slot change before attacking (use current slot)
+     */
+    private void applyExplodeSlot() {
+        if (useExplodeSlot.getValue() && mc.player != null) {
+            mc.player.getInventory().selectedSlot = explodeSlot.getValueInt() - 1;
+        }
     }
 
     private void resetDelays() {
@@ -135,14 +170,15 @@ public final class KeyCrystal extends Module {
 
         if (mc.crosshairTarget instanceof EntityHitResult entityHit && breakTimer.hasElapsedTime(currentBreakDelay)) {
             if (entityHit.getEntity() instanceof EndCrystalEntity crystal && randomInt <= breakChance.getValueInt()) {
-                    if (mc.player.getEntityPos().distanceTo(crystal.getEntityPos()) <= 6.0) {
-                        if (antiWeakness.getValue() &&
-                                mc.player.hasStatusEffect(StatusEffects.WEAKNESS)) {
+                if (mc.player.getEntityPos().distanceTo(crystal.getEntityPos()) <= 6.0) {
+                    if (antiWeakness.getValue() && mc.player.hasStatusEffect(StatusEffects.WEAKNESS)) {
                         InventoryUtil.swapToSword();
+                    } else {
+                        // Apply explode slot before attacking the crystal
+                        applyExplodeSlot();
                     }
 
                     ((MinecraftClientAccessor) mc).invokeDoAttack();
-
 
                     breakTimer.reset();
                     currentBreakDelay = random.nextLong(minBreakDelay.getValueInt(), maxBreakDelay.getValueInt());
@@ -150,7 +186,6 @@ public final class KeyCrystal extends Module {
                 return;
             }
         }
-
 
         if (mc.crosshairTarget instanceof BlockHitResult blockHit && placeTimer.hasElapsedTime(currentPlaceDelay)) {
             BlockPos targetBlock = blockHit.getBlockPos();
@@ -224,7 +259,6 @@ public final class KeyCrystal extends Module {
         }
         return false;
     }
-
 
     @Override
     public void onDisable() {
