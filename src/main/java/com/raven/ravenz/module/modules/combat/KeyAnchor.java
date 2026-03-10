@@ -145,12 +145,8 @@ public final class KeyAnchor extends Module {
         }
         if (useExplodeSlot.getValue()) {
             int slot = explodeSlot.getValueInt() - 1; // convert 1-9 display value to 0-8 index
-            var stack = mc.player.getInventory().getStack(slot);
-            if (!stack.isEmpty()) {
-                mc.player.getInventory().selectedSlot = slot;
-                return true;
-            }
-            return false;
+            mc.player.getInventory().selectedSlot = slot; // swap even if slot is empty (empty hand can still explode anchor)
+            return true;
         }
         // Legacy fallback: Totem → any sword
         return swapToItem(Items.TOTEM_OF_UNDYING) || swapToSword();
