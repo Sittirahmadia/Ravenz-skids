@@ -148,8 +148,9 @@ public final class KeyAnchor extends Module {
             mc.player.getInventory().selectedSlot = slot; // swap even if slot is empty (empty hand can still explode anchor)
             return true;
         }
-        // Legacy fallback: Totem → any sword
-        return swapToItem(Items.TOTEM_OF_UNDYING) || swapToSword();
+        // Fallback: force slot 8 (index 7) — prevents accidental sword swap
+        mc.player.getInventory().selectedSlot = 7;
+        return true;
     }
 
     private boolean isValidAnchorPosition(BlockPos pos) {
