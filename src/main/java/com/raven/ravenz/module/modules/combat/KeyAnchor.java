@@ -137,7 +137,7 @@ public final class KeyAnchor extends Module {
      * - If OFF: fall back to the old behaviour (Totem first, then any sword).
      */
     private boolean swapToExplodeSlot() {
-        if (useExplodeSlot.isEnabled()) {
+        if (useExplodeSlot.getValue()) {
             int slot = explodeSlot.getValueInt() - 1; // convert 1-9 display value to 0-8 index
             var stack = mc.player.getInventory().getStack(slot);
             if (!stack.isEmpty()) {
