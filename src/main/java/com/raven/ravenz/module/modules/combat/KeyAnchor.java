@@ -48,12 +48,14 @@ public final class KeyAnchor extends Module {
 
         boolean currentKeyState = KeyUtils.isKeyPressed(anchorKeybind.getKeyCode());
 
-        // Single tap — only trigger on key down edge
-        if (currentKeyState && !keyPressed) {
+        // Hold — fire repeatedly on timer while key is held
+        if (currentKeyState) {
             if (timer.hasElapsedTime(delay.getValueInt())) {
                 processAnchorPvP();
                 timer.reset();
             }
+        } else {
+            timer.reset();
         }
 
         keyPressed = currentKeyState;
