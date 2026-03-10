@@ -29,10 +29,8 @@ public final class KeyAnchor extends Module {
 
     private final TimerUtil timer = new TimerUtil();
 
-    // State — only used for restoring slot after place
+    // State
     private boolean keyPressed = false;
-    private int originalSlot = -1;
-    private boolean pendingRestoreSlot = false;
 
     public KeyAnchor() {
         super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
@@ -58,13 +56,6 @@ public final class KeyAnchor extends Module {
         }
 
         keyPressed = currentKeyState;
-
-        // Tick pending slot restore — only triggered after placing an anchor
-        if (pendingRestoreSlot) {
-            restoreOriginalSlot();
-            pendingRestoreSlot = false;
-            originalSlot = -1;
-        }
     }
 
     private void processAnchorPvP() {
@@ -79,45 +70,41 @@ public final class KeyAnchor extends Module {
         if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
             int charges = blockState.get(RespawnAnchorBlock.CHARGES);
             if (charges > 0) {
-                // Anchor is charged — swap to explode slot and explode, stay there permanently
+                // Anchor is charged — explode it and STAY on explode slot
                 swapToExplodeSlot();
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // No restore after explode — force stays on explode slot
+                // Do NOT restore slot after explode — stay on explode slot permanently
             } else {
-                // Anchor is uncharged — recharge with glowstone, then force back to explode slot
+                // Anchor is uncharged — recharge with glowstone
                 if (swapToItem(Items.GLOWSTONE)) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                    // After recharge, immediately force to explode slot (no restore to original)
-                    swapToExplodeSlot();
                 }
             }
             return;
         }
 
-        // Not an anchor — place one, then restore to previous slot
+        // Not an anchor — try to place one, then restore slot
         BlockPos placementPos = targetBlock.offset(blockHit.getSide());
         if (isValidAnchorPosition(placementPos)) {
-            int slotBefore = mc.player.getInventory().selectedSlot;
             if (swapToItem(Items.RESPAWN_ANCHOR)) {
-                ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // Schedule restore to previous slot after placing
-                originalSlot = slotBefore;
-                pendingRestoreSlot = true;
-            }
+                    ((MinecraftClientAccessor) mc).invokeDoItemUse();
+                }
         }
     }
 
     /**
      * Swap to the correct slot for exploding the anchor.
-     * - Use Explode Slot ON  -> switch to configured slot (1-9)
-     * - Use Explode Slot OFF -> force slot 8 (index 7)
+     * - Use Explode Slot ON -> switch to configured slot (1-9)
+     * - OFF -> force slot 8 (index 7)
      */
     private void swapToExplodeSlot() {
         if (useExplodeSlot.getValue()) {
             mc.player.getInventory().selectedSlot = explodeSlot.getValueInt() - 1;
-        } else {
-            mc.player.getInventory().selectedSlot = 7;
+            return;
         }
+
+        // Fallback: force slot 8 (index 7)
+        mc.player.getInventory().selectedSlot = 7;
     }
 
     private boolean swapToItem(net.minecraft.item.Item item) {
@@ -148,16 +135,12 @@ public final class KeyAnchor extends Module {
     @Override
     public void onEnable() {
         keyPressed = false;
-        originalSlot = -1;
-        pendingRestoreSlot = false;
         timer.reset();
         super.onEnable();
     }
 
     @Override
     public void onDisable() {
-        pendingRestoreSlot = false;
-        originalSlot = -1;
         super.onDisable();
     }
 
