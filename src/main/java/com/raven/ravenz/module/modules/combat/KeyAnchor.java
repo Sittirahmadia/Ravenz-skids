@@ -22,26 +22,22 @@ public final class KeyAnchor extends Module {
 
     private final KeybindSetting anchorKeybind = new KeybindSetting("Anchor Key", GLFW.GLFW_MOUSE_BUTTON_4, false);
     private final NumberSetting delay = new NumberSetting("Delay (MS)", 1, 500, 50, 1);
-    private final NumberSetting restoreDelayTicks = new NumberSetting("Restore Delay", 1, 20, 2, 1);
 
     // Explode Slot settings
     private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
     private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 1, 1);
-    private final BooleanSetting useHand = new BooleanSetting("Use Hand", false);
 
     private final TimerUtil timer = new TimerUtil();
 
     // State
     private boolean keyPressed = false;
-    private boolean isActive = false;
     private int originalSlot = -1;
-    private boolean hasPlacedThisCycle = false;
     private boolean pendingRestoreSlot = false;
     private int pendingRestoreTicksLeft = 0;
 
     public KeyAnchor() {
         super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
-        this.addSettings(anchorKeybind, delay, restoreDelayTicks, useExplodeSlot, explodeSlot, useHand);
+        this.addSettings(anchorKeybind, delay, useExplodeSlot, explodeSlot);
         this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(anchorKeybind));
     }
 
@@ -52,52 +48,26 @@ public final class KeyAnchor extends Module {
 
         boolean currentKeyState = KeyUtils.isKeyPressed(anchorKeybind.getKeyCode());
 
+        // Single tap — only trigger on key down edge
         if (currentKeyState && !keyPressed) {
-            // Key just pressed — cancel any pending restore first so originalSlot is still valid
-            cancelPendingRestore();
-            startAnchorPvP();
-        } else if (!currentKeyState && keyPressed) {
-            // Key just released
-            stopAnchorPvP();
-        } else if (!currentKeyState) {
-            // Key is not held — allow placing again next press
-            hasPlacedThisCycle = false;
+            if (timer.hasElapsedTime(delay.getValueInt())) {
+                processAnchorPvP();
+                timer.reset();
+            }
         }
 
         keyPressed = currentKeyState;
 
-        // Process anchor logic on timer while key is held
-        if (isActive && timer.hasElapsedTime(delay.getValueInt())) {
-            processAnchorPvP();
-            timer.reset();
-        }
-
-        // Tick down pending slot restore
+        // Tick down pending slot restore (only used after place, not after explode)
         if (pendingRestoreSlot) {
             if (pendingRestoreTicksLeft <= 0) {
                 restoreOriginalSlot();
                 pendingRestoreSlot = false;
+                originalSlot = -1;
             } else {
                 pendingRestoreTicksLeft--;
             }
         }
-    }
-
-    private void startAnchorPvP() {
-        if (isActive) return;
-        isActive = true;
-        originalSlot = mc.player.getInventory().selectedSlot;
-        hasPlacedThisCycle = false;
-        timer.reset();
-    }
-
-    private void stopAnchorPvP() {
-        if (!isActive) return;
-        cancelPendingRestore();
-        restoreOriginalSlot();
-        isActive = false;
-        originalSlot = -1;
-        hasPlacedThisCycle = false;
     }
 
     private void processAnchorPvP() {
@@ -112,54 +82,63 @@ public final class KeyAnchor extends Module {
         if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
             int charges = blockState.get(RespawnAnchorBlock.CHARGES);
             if (charges > 0) {
-                // Anchor is charged — explode it
+                // Anchor is charged — explode it and STAY on explode slot
                 swapToExplodeSlot();
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // Only schedule restore if we actually switched slots
-                if (!useHand.getValue()) {
-                    scheduleRestoreOriginalSlot();
-                }
-                // Reset place flag so we can place again after explode
-                hasPlacedThisCycle = false;
+                // Do NOT restore slot after explode — stay on explode slot permanently
             } else {
-                // Anchor is uncharged — recharge with glowstone
+                // Anchor is uncharged — recharge with glowstone, then restore
+                int slotBefore = mc.player.getInventory().selectedSlot;
                 if (swapToItem(Items.GLOWSTONE)) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                    scheduleRestoreOriginalSlot();
+                    // Restore to explode slot after recharging, not to original
+                    scheduleRestoreToExplodeSlot(slotBefore);
                 }
             }
             return;
         }
 
-        // Not an anchor — try to place one
+        // Not an anchor — try to place one, then restore slot
         BlockPos placementPos = targetBlock.offset(blockHit.getSide());
-        if (!hasPlacedThisCycle && isValidAnchorPosition(placementPos)) {
+        if (isValidAnchorPosition(placementPos)) {
+            int slotBefore = mc.player.getInventory().selectedSlot;
             if (swapToItem(Items.RESPAWN_ANCHOR)) {
-                hasPlacedThisCycle = true;
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                scheduleRestoreOriginalSlot();
+                // Restore to previous slot after placing
+                originalSlot = slotBefore;
+                pendingRestoreSlot = true;
+                pendingRestoreTicksLeft = 0;
             }
         }
     }
 
     /**
      * Swap to the correct slot for exploding the anchor.
-     * Priority:
-     *   1. Use Hand ON  -> keep current slot, use whatever is in hand
-     *   2. Use Explode Slot ON -> switch to configured slot (1-9)
-     *   3. Both OFF -> force slot 8 (index 7) to avoid accidental sword swap
+     * - Use Explode Slot ON -> switch to configured slot (1-9)
+     * - OFF -> force slot 8 (index 7)
      */
     private void swapToExplodeSlot() {
-        if (useHand.getValue()) return; // keep current slot
-
         if (useExplodeSlot.getValue()) {
-            int slot = explodeSlot.getValueInt() - 1; // 1-9 -> 0-8
-            mc.player.getInventory().selectedSlot = slot;
+            mc.player.getInventory().selectedSlot = explodeSlot.getValueInt() - 1;
             return;
         }
 
         // Fallback: force slot 8 (index 7)
         mc.player.getInventory().selectedSlot = 7;
+    }
+
+    /**
+     * After recharging with glowstone, go back to the explode slot (not original slot).
+     * This ensures slot stays on explode slot and is ready for next explode.
+     */
+    private void scheduleRestoreToExplodeSlot(int fallbackSlot) {
+        if (useExplodeSlot.getValue()) {
+            originalSlot = explodeSlot.getValueInt() - 1;
+        } else {
+            originalSlot = 7;
+        }
+        pendingRestoreSlot = true;
+        pendingRestoreTicksLeft = 0;
     }
 
     private boolean swapToItem(net.minecraft.item.Item item) {
@@ -187,24 +166,10 @@ public final class KeyAnchor extends Module {
         }
     }
 
-    private void scheduleRestoreOriginalSlot() {
-        if (originalSlot == -1) return;
-        // Reset tick counter every time to avoid stacking multiple restores
-        pendingRestoreSlot = true;
-        pendingRestoreTicksLeft = restoreDelayTicks.getValueInt();
-    }
-
-    private void cancelPendingRestore() {
-        pendingRestoreSlot = false;
-        pendingRestoreTicksLeft = 0;
-    }
-
     @Override
     public void onEnable() {
         keyPressed = false;
-        isActive = false;
         originalSlot = -1;
-        hasPlacedThisCycle = false;
         pendingRestoreSlot = false;
         pendingRestoreTicksLeft = 0;
         timer.reset();
@@ -213,7 +178,9 @@ public final class KeyAnchor extends Module {
 
     @Override
     public void onDisable() {
-        stopAnchorPvP();
+        pendingRestoreSlot = false;
+        pendingRestoreTicksLeft = 0;
+        originalSlot = -1;
         super.onDisable();
     }
 
