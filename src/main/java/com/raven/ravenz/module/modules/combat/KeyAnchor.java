@@ -29,11 +29,10 @@ public final class KeyAnchor extends Module {
 
     private final TimerUtil timer = new TimerUtil();
 
-    // State
+    // State — only used for restoring slot after place
     private boolean keyPressed = false;
     private int originalSlot = -1;
     private boolean pendingRestoreSlot = false;
-    private int pendingRestoreTicksLeft = 0;
 
     public KeyAnchor() {
         super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
@@ -60,15 +59,11 @@ public final class KeyAnchor extends Module {
 
         keyPressed = currentKeyState;
 
-        // Tick down pending slot restore (only used after place, not after explode)
+        // Tick pending slot restore — only triggered after placing an anchor
         if (pendingRestoreSlot) {
-            if (pendingRestoreTicksLeft <= 0) {
-                restoreOriginalSlot();
-                pendingRestoreSlot = false;
-                originalSlot = -1;
-            } else {
-                pendingRestoreTicksLeft--;
-            }
+            restoreOriginalSlot();
+            pendingRestoreSlot = false;
+            originalSlot = -1;
         }
     }
 
@@ -84,63 +79,45 @@ public final class KeyAnchor extends Module {
         if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
             int charges = blockState.get(RespawnAnchorBlock.CHARGES);
             if (charges > 0) {
-                // Anchor is charged — explode it and STAY on explode slot
+                // Anchor is charged — swap to explode slot and explode, stay there permanently
                 swapToExplodeSlot();
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // Do NOT restore slot after explode — stay on explode slot permanently
+                // No restore after explode — force stays on explode slot
             } else {
-                // Anchor is uncharged — recharge with glowstone, then restore
-                int slotBefore = mc.player.getInventory().selectedSlot;
+                // Anchor is uncharged — recharge with glowstone, then force back to explode slot
                 if (swapToItem(Items.GLOWSTONE)) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                    // Restore to explode slot after recharging, not to original
-                    scheduleRestoreToExplodeSlot(slotBefore);
+                    // After recharge, immediately force to explode slot (no restore to original)
+                    swapToExplodeSlot();
                 }
             }
             return;
         }
 
-        // Not an anchor — try to place one, then restore slot
+        // Not an anchor — place one, then restore to previous slot
         BlockPos placementPos = targetBlock.offset(blockHit.getSide());
         if (isValidAnchorPosition(placementPos)) {
             int slotBefore = mc.player.getInventory().selectedSlot;
             if (swapToItem(Items.RESPAWN_ANCHOR)) {
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // Restore to previous slot after placing
+                // Schedule restore to previous slot after placing
                 originalSlot = slotBefore;
                 pendingRestoreSlot = true;
-                pendingRestoreTicksLeft = 0;
             }
         }
     }
 
     /**
      * Swap to the correct slot for exploding the anchor.
-     * - Use Explode Slot ON -> switch to configured slot (1-9)
-     * - OFF -> force slot 8 (index 7)
+     * - Use Explode Slot ON  -> switch to configured slot (1-9)
+     * - Use Explode Slot OFF -> force slot 8 (index 7)
      */
     private void swapToExplodeSlot() {
         if (useExplodeSlot.getValue()) {
             mc.player.getInventory().selectedSlot = explodeSlot.getValueInt() - 1;
-            return;
-        }
-
-        // Fallback: force slot 8 (index 7)
-        mc.player.getInventory().selectedSlot = 7;
-    }
-
-    /**
-     * After recharging with glowstone, go back to the explode slot (not original slot).
-     * This ensures slot stays on explode slot and is ready for next explode.
-     */
-    private void scheduleRestoreToExplodeSlot(int fallbackSlot) {
-        if (useExplodeSlot.getValue()) {
-            originalSlot = explodeSlot.getValueInt() - 1;
         } else {
-            originalSlot = 7;
+            mc.player.getInventory().selectedSlot = 7;
         }
-        pendingRestoreSlot = true;
-        pendingRestoreTicksLeft = 0;
     }
 
     private boolean swapToItem(net.minecraft.item.Item item) {
@@ -173,7 +150,6 @@ public final class KeyAnchor extends Module {
         keyPressed = false;
         originalSlot = -1;
         pendingRestoreSlot = false;
-        pendingRestoreTicksLeft = 0;
         timer.reset();
         super.onEnable();
     }
@@ -181,7 +157,6 @@ public final class KeyAnchor extends Module {
     @Override
     public void onDisable() {
         pendingRestoreSlot = false;
-        pendingRestoreTicksLeft = 0;
         originalSlot = -1;
         super.onDisable();
     }
