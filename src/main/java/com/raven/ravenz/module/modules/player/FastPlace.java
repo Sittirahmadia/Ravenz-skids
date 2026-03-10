@@ -1,0 +1,58 @@
+package com.raven.ravenz.module.modules.player;
+
+
+import com.raven.ravenz.event.impl.player.TickEvent;
+import com.raven.ravenz.mixin.MinecraftClientAccessor;
+import com.raven.ravenz.module.Category;
+import com.raven.ravenz.module.Module;
+import com.raven.ravenz.module.setting.BooleanSetting;
+import com.raven.ravenz.module.setting.NumberSetting;
+import com.raven.ravenz.utils.math.TimerUtil;
+import meteordevelopment.orbit.EventHandler;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+
+public final class FastPlace extends Module {
+
+    private final BooleanSetting blocksOnly = new BooleanSetting("Blocks Only", true);
+    private final NumberSetting delay = new NumberSetting("Delay", 0, 4, 0, 1);
+    private final TimerUtil timer = new TimerUtil();
+
+    public FastPlace() {
+        super("Fast Place", "Bypasses item use cooldown for faster block placement", -1, Category.PLAYER);
+        this.addSettings(blocksOnly, delay);
+    }
+
+    @EventHandler
+    private void onTickEvent(TickEvent event) {
+        if (isNull()) return;
+
+        if (blocksOnly.getValue()) {
+            ItemStack heldItem = mc.player.getMainHandStack();
+            if (heldItem.isEmpty() || !(heldItem.getItem() instanceof BlockItem)) {
+                return;
+            }
+        }
+
+        long delayMs = delay.getValueInt() * 50L;
+        if (timer.hasElapsedTime(delayMs, true)) {
+            ((MinecraftClientAccessor) mc).setItemUseCooldown(0);
+        }
+    }
+
+    @Override
+    public void onEnable() {
+        timer.reset();
+        super.onEnable();
+    }
+
+    @Override
+    public void onDisable() {
+        timer.reset();
+
+        if (mc.player != null) {
+            ((MinecraftClientAccessor) mc).setItemUseCooldown(4);
+        }
+        super.onDisable();
+    }
+}

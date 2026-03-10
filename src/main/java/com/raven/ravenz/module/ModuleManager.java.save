@@ -1,0 +1,101 @@
+package com.raven.ravenz.module;
+
+import com.raven.ravenz.module.modules.client.Client;
+import com.raven.ravenz.module.modules.client.ClientSettingsModule;
+import com.raven.ravenz.module.modules.client.ClickGUIModule;
+import com.raven.ravenz.module.modules.client.NewClickGUIModule;
+import com.raven.ravenz.module.modules.client.RichModernGUIModule;
+import com.raven.ravenz.module.modules.client.Debugger;
+import com.raven.ravenz.module.modules.client.KeybindsModule;
+import com.raven.ravenz.module.modules.client.Secret;
+import com.raven.ravenz.module.modules.combat.*;
+import com.raven.ravenz.module.modules.misc.*;
+import com.raven.ravenz.module.modules.player.*;
+import com.raven.ravenz.module.modules.render.*;
+import com.raven.ravenz.module.modules.movement.AutoFirework;
+import com.raven.ravenz.module.modules.movement.AutoHeadHitter;
+import com.raven.ravenz.module.modules.movement.KeepSimport com.raven.ravenz.module.modules.movement.SnapTap;
+import com.raven.ravenz.module.modules.movement.Sprint;
+import lombok.Getter;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+@Getter
+public final class ModuleManager {
+
+    private final List<Module> modules = new java.util.ArrayList<>();
+
+    public ModuleManager() {
+        addModules();
+    }
+
+    public List<Module> getEnabledModules() {
+        return modules.stream()
+                .filter(Module::isEnabled)
+                .toList();
+    }
+
+    public List<Module> getModulesInCategory(Category category) {
+        return modules.stream()
+                .filter(module -> module.getModuleCategory() == category)
+                .toList();
+    }
+
+    public List<Module> getModulesByCategory(Category category) {
+        return getModulesInCategory(category);
+    }
+
+    public <T extends Module> Optional<T> getModule(Class<T> moduleClass) {
+        return modules.stream()
+                .filter(module -> module.getClass().equals(moduleClass))
+                .map(moduleClass::cast)
+                .findFirst();
+    }
+
+    private void addModules() {
+        // Combat
+        add(
+                new AutoMace(), new TotemHit(), new TriggerBot(),
+                new ShieldBreaker(), new ThrowPot(), new ElytraHotSwap(),
+                new WTap(), new SwordHotSwap(), new SwordSwap(), new BreachSwap(),
+                new KeyLava(), new AutoPot(), //new StunCob(),
+                new XbowCart(), new HitCob(),
+                new SpearKill(), new SpearSwap(),
+                new AimAssist(), new Hitboxes(),
+                new AutoAnchor(), new AutoHitCrystal(),
+                new AutoCrystal(), new AutoDtap(),
+                new com.raven.ravenz.module.modules.combat.AutoDoubleHand(), new com.raven.ravenz.module.modules.combat.AutoInventoryTotem(), new TriggerBotV2());
+        // Movement
+        add(new Sprint(), new AutoFirework(), new AutoHeadHitter(), new KeepSprint(), new SnapTap());
+
+        // Player
+        add(
+                new AutoExtinguish(), new AutoTool(), new AutoWeb(), new AutoRefill(),
+                new AutoDrain(), new AutoCrafter(), new FastPlace(), new FastEXP(),
+                new TrapSave(), new PingSpoof(),
+                new AutoMLG(), new FastMine(), new ReBuffNotifier(), new CoverUp());
+
+        // Render
+        add(
+                new ContainerSlots(), new FullBright(), new Watermark(), new TargetHUD(),
+                new SwingSpeed(), new DynamicIsland(),
+                new Notifications(), new ArrowESP(), new OutlineESP(), new CustomOutlineESP(), new ESP2D(), new ESP3D(), new TargetESP(),
+                new ArrayList(), new Trajectories(), new BlurTest(), new AspectRatio(), new Nametags());
+
+        // Misc
+        add(
+                new CartKey(), new HoverTotem(), new MiddleClickFriend(),
+                new PearlKey(), new PearlCatch(), new WindChargeKey(), new Teams(), new FakePlayer(),
+                new Friends(), new AsmrKeyboard(), new DoubleAnchor(), new SafeAnchorAuto());
+
+        // Client
+        add(new ClickGUIModule(), new NewClickGUIModule(), new RichModernGUIModule(), new ClientSettingsModule(), new Client(), new Debugger(),
+                new Secret(), new KeybindsModule());
+    }
+
+    private void add(Module... mods) {
+        modules.addAll(Arrays.asList(mods));
+    }
+}
