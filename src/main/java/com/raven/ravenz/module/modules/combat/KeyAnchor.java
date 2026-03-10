@@ -29,6 +29,7 @@ public final class KeyAnchor extends Module {
     // Explode Slot settings
     private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
     private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 1, 1);
+    private final BooleanSetting useHand = new BooleanSetting("Use Hand", false);
 
     private final TimerUtil timer = new TimerUtil();
     private boolean keyPressed = false;
@@ -40,7 +41,7 @@ public final class KeyAnchor extends Module {
 
     public KeyAnchor() {
         super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
-        this.addSettings(anchorKeybind, delay, restoreDelayTicks, useExplodeSlot, explodeSlot);
+        this.addSettings(anchorKeybind, delay, restoreDelayTicks, useExplodeSlot, explodeSlot, useHand);
         this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(anchorKeybind));
     }
 
@@ -133,10 +134,15 @@ public final class KeyAnchor extends Module {
 
     /**
      * Swap to the explode slot.
+     * - If "Use Hand" is ON: use whatever is currently in hand (no slot swap needed).
      * - If "Use Explode Slot" is ON: switch to the configured hotbar slot (1–9 → index 0–8).
-     * - If OFF: fall back to the old behaviour (Totem first, then any sword).
+     * - If both OFF: fall back to the old behaviour (Totem first, then any sword).
      */
     private boolean swapToExplodeSlot() {
+        if (useHand.getValue()) {
+            // Just use current hand item, no slot switch needed
+            return true;
+        }
         if (useExplodeSlot.getValue()) {
             int slot = explodeSlot.getValueInt() - 1; // convert 1-9 display value to 0-8 index
             var stack = mc.player.getInventory().getStack(slot);
