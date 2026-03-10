@@ -1,8 +1,6 @@
 package com.raven.ravenz.module.modules.combat;
 
 import com.raven.ravenz.event.impl.input.HandleInputEvent;
-import com.raven.ravenz.event.impl.player.ItemUseEvent;
-import com.raven.ravenz.event.impl.player.TickEvent;
 import com.raven.ravenz.mixin.MinecraftClientAccessor;
 import com.raven.ravenz.module.Category;
 import com.raven.ravenz.module.Module;
@@ -11,225 +9,212 @@ import com.raven.ravenz.module.setting.KeybindSetting;
 import com.raven.ravenz.module.setting.NumberSetting;
 import com.raven.ravenz.utils.keybinding.KeyUtils;
 import com.raven.ravenz.utils.math.TimerUtil;
-import com.raven.ravenz.utils.mc.InventoryUtil;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Item;
+import net.minecraft.block.RespawnAnchorBlock;
 import net.minecraft.item.Items;
 import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.List;
-import java.util.Random;
+public final class KeyAnchor extends Module {
 
-public final class KeyCrystal extends Module {
+    private final KeybindSetting anchorKeybind = new KeybindSetting("Anchor Key", GLFW.GLFW_MOUSE_BUTTON_4, false);
+    private final NumberSetting delay = new NumberSetting("Delay (MS)", 1, 500, 50, 1);
+    private final NumberSetting restoreDelayTicks = new NumberSetting("Restore Delay", 1, 20, 2, 1);
 
-    private final KeybindSetting crystalKeybind = new KeybindSetting("Crystal Key", GLFW.GLFW_MOUSE_BUTTON_4, false);
-    private final BooleanSetting antiSuicide = new BooleanSetting("Anti Suicide", true);
-    private final BooleanSetting antiWeakness = new BooleanSetting("Anti Weakness", true);
-    private final BooleanSetting stopOnKill = new BooleanSetting("Stop On Kill", false);
+    // Explode Slot settings
+    private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
+    private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 1, 1);
+    private final BooleanSetting useHand = new BooleanSetting("Use Hand", false);
 
-    private final NumberSetting placeChance = new NumberSetting("Place Chance (%)", 0, 100, 100, 1);
-    private final NumberSetting breakChance = new NumberSetting("Break Chance (%)", 0, 100, 100, 1);
+    private final TimerUtil timer = new TimerUtil();
 
-    private final NumberSetting minBreakDelay = new NumberSetting("Min Break Delay (MS)", 10, 500, 50, 1);
-    private final NumberSetting maxBreakDelay = new NumberSetting("Max Break Delay (MS)", 10, 500, 100, 1);
-    private final NumberSetting minPlaceDelay = new NumberSetting("Min Place Delay (MS)", 10, 500, 30, 1);
-    private final NumberSetting maxPlaceDelay = new NumberSetting("Max Place Delay (MS)", 10, 500, 80, 1);
-
-    private final TimerUtil breakTimer = new TimerUtil();
-    private final TimerUtil placeTimer = new TimerUtil();
-    private final Random random = new Random();
-
+    // State
     private boolean keyPressed = false;
     private boolean isActive = false;
     private int originalSlot = -1;
-    private boolean hasPlacedObsidian = false;
+    private boolean hasPlacedThisCycle = false;
+    private boolean pendingRestoreSlot = false;
+    private int pendingRestoreTicksLeft = 0;
 
-    private long currentBreakDelay;
-    private long currentPlaceDelay;
-
-    public KeyCrystal() {
-        super("Key Crystal", "Automatically places and explodes crystals and obsidian for PvP", -1, Category.COMBAT);
-        this.addSettings(
-                crystalKeybind,
-                placeChance, breakChance, stopOnKill,
-                minBreakDelay, maxBreakDelay, minPlaceDelay, maxPlaceDelay,
-                antiSuicide, antiWeakness
-        );
-
-        this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(crystalKeybind));
+    public KeyAnchor() {
+        super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
+        this.addSettings(anchorKeybind, delay, restoreDelayTicks, useExplodeSlot, explodeSlot, useHand);
+        this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(anchorKeybind));
     }
 
     @EventHandler
     private void onTickEvent(HandleInputEvent event) {
-        if (isNull() || mc.currentScreen != null) return;
+        if (isNull() || !isEnabled()) return;
+        if (mc.currentScreen != null) return;
 
-        if (minBreakDelay.getValueFloat() >= maxBreakDelay.getValueFloat())
-            minBreakDelay.setValue(maxBreakDelay.getValueFloat() - 1);
-        if (minPlaceDelay.getValueFloat() >= maxPlaceDelay.getValueFloat())
-            minPlaceDelay.setValue(maxPlaceDelay.getValueFloat() - 1);
+        boolean currentKeyState = KeyUtils.isKeyPressed(anchorKeybind.getKeyCode());
 
-        boolean currentKeyState = KeyUtils.isKeyPressed(crystalKeybind.getKeyCode());
-
-        if (currentKeyState && !keyPressed) startCrystalPvP();
-        else if (!currentKeyState && keyPressed) stopCrystalPvP();
+        if (currentKeyState && !keyPressed) {
+            // Key just pressed — cancel any pending restore first so originalSlot is still valid
+            cancelPendingRestore();
+            startAnchorPvP();
+        } else if (!currentKeyState && keyPressed) {
+            // Key just released
+            stopAnchorPvP();
+        } else if (!currentKeyState) {
+            // Key is not held — allow placing again next press
+            hasPlacedThisCycle = false;
+        }
 
         keyPressed = currentKeyState;
 
-        if (isActive) processCrystalPvP();
+        // Process anchor logic on timer while key is held
+        if (isActive && timer.hasElapsedTime(delay.getValueInt())) {
+            processAnchorPvP();
+            timer.reset();
+        }
+
+        // Tick down pending slot restore
+        if (pendingRestoreSlot) {
+            if (pendingRestoreTicksLeft <= 0) {
+                restoreOriginalSlot();
+                pendingRestoreSlot = false;
+            } else {
+                pendingRestoreTicksLeft--;
+            }
+        }
     }
 
-    private void startCrystalPvP() {
+    private void startAnchorPvP() {
         if (isActive) return;
         isActive = true;
         originalSlot = mc.player.getInventory().selectedSlot;
-        hasPlacedObsidian = false;
-        resetDelays();
+        hasPlacedThisCycle = false;
+        timer.reset();
     }
 
-    private void stopCrystalPvP() {
+    private void stopAnchorPvP() {
         if (!isActive) return;
-        if (originalSlot != -1) mc.player.getInventory().selectedSlot = originalSlot;
+        cancelPendingRestore();
+        restoreOriginalSlot();
         isActive = false;
         originalSlot = -1;
-        hasPlacedObsidian = false;
-        resetDelays();
+        hasPlacedThisCycle = false;
     }
 
-    private void resetDelays() {
-        breakTimer.reset();
-        placeTimer.reset();
+    private void processAnchorPvP() {
+        if (mc.world == null || mc.player == null) return;
+        if (!(mc.crosshairTarget instanceof BlockHitResult blockHit)) return;
 
-        int minBreak = minBreakDelay.getValueInt();
-        int maxBreak = maxBreakDelay.getValueInt();
-        int minPlace = minPlaceDelay.getValueInt();
-        int maxPlace = maxPlaceDelay.getValueInt();
+        BlockPos targetBlock = blockHit.getBlockPos();
+        var blockState = mc.world.getBlockState(targetBlock);
 
-        if (minBreak >= maxBreak) {
-            maxBreak = minBreak + 1;
-            maxBreakDelay.setValue(maxBreak);
-        }
-        if (minPlace >= maxPlace) {
-            maxPlace = minPlace + 1;
-            maxPlaceDelay.setValue(maxPlace);
-        }
+        if (blockState.isAir()) return;
 
-        currentBreakDelay = minBreak + random.nextInt(maxBreak - minBreak);
-        currentPlaceDelay = minPlace + random.nextInt(maxPlace - minPlace);
-    }
-
-    private void processCrystalPvP() {
-        if (antiSuicide.getValue() && !mc.player.isOnGround()) return;
-        if (stopOnKill.getValue() && isDeadPlayerNearby()) return;
-
-        int randomInt = random.nextInt(100) + 1;
-
-        if (mc.crosshairTarget instanceof EntityHitResult entityHit && breakTimer.hasElapsedTime(currentBreakDelay)) {
-            if (entityHit.getEntity() instanceof EndCrystalEntity crystal && randomInt <= breakChance.getValueInt()) {
-                    if (mc.player.getEntityPos().distanceTo(crystal.getEntityPos()) <= 6.0) {
-                        if (antiWeakness.getValue() &&
-                                mc.player.hasStatusEffect(StatusEffects.WEAKNESS)) {
-                        InventoryUtil.swapToSword();
-                    }
-
-                    ((MinecraftClientAccessor) mc).invokeDoAttack();
-
-
-                    breakTimer.reset();
-                    currentBreakDelay = random.nextLong(minBreakDelay.getValueInt(), maxBreakDelay.getValueInt());
+        if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
+            int charges = blockState.get(RespawnAnchorBlock.CHARGES);
+            if (charges > 0) {
+                // Anchor is charged — explode it
+                swapToExplodeSlot();
+                ((MinecraftClientAccessor) mc).invokeDoItemUse();
+                // Only schedule restore if we actually switched slots
+                if (!useHand.getValue()) {
+                    scheduleRestoreOriginalSlot();
                 }
-                return;
-            }
-        }
-
-
-        if (mc.crosshairTarget instanceof BlockHitResult blockHit && placeTimer.hasElapsedTime(currentPlaceDelay)) {
-            BlockPos targetBlock = blockHit.getBlockPos();
-            BlockPos placementPos = targetBlock.offset(blockHit.getSide());
-
-            if (isObsidianOrBedrock(targetBlock) && isValidCrystalPosition(placementPos)
-                    && randomInt <= placeChance.getValueInt()) {
-                if (hasItemInHotbar(Items.END_CRYSTAL)) {
-                    InventoryUtil.swapToSlot(Items.END_CRYSTAL);
+                // Reset place flag so we can place again after explode
+                hasPlacedThisCycle = false;
+            } else {
+                // Anchor is uncharged — recharge with glowstone
+                if (swapToItem(Items.GLOWSTONE)) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                    placeTimer.reset();
-                    currentPlaceDelay = random.nextLong(minPlaceDelay.getValueInt(), maxPlaceDelay.getValueInt());
+                    scheduleRestoreOriginalSlot();
                 }
-            } else if (isValidPosition(placementPos) && !hasPlacedObsidian) {
-                BlockPos below = placementPos.down();
-                if (!mc.world.getBlockState(below).isAir()) {
-                    if (hasItemInHotbar(Items.OBSIDIAN)) {
-                        InventoryUtil.swapToSlot(Items.OBSIDIAN);
-                        ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                        hasPlacedObsidian = true;
-                        placeTimer.reset();
-                        currentPlaceDelay = random.nextLong(minPlaceDelay.getValueInt(), maxPlaceDelay.getValueInt());
-                    }
-                }
+            }
+            return;
+        }
+
+        // Not an anchor — try to place one
+        BlockPos placementPos = targetBlock.offset(blockHit.getSide());
+        if (!hasPlacedThisCycle && isValidAnchorPosition(placementPos)) {
+            if (swapToItem(Items.RESPAWN_ANCHOR)) {
+                hasPlacedThisCycle = true;
+                ((MinecraftClientAccessor) mc).invokeDoItemUse();
+                scheduleRestoreOriginalSlot();
             }
         }
     }
 
-    private boolean hasItemInHotbar(Item item) {
+    /**
+     * Swap to the correct slot for exploding the anchor.
+     * Priority:
+     *   1. Use Hand ON  -> keep current slot, use whatever is in hand
+     *   2. Use Explode Slot ON -> switch to configured slot (1-9)
+     *   3. Both OFF -> force slot 8 (index 7) to avoid accidental sword swap
+     */
+    private void swapToExplodeSlot() {
+        if (useHand.getValue()) return; // keep current slot
+
+        if (useExplodeSlot.getValue()) {
+            int slot = explodeSlot.getValueInt() - 1; // 1-9 -> 0-8
+            mc.player.getInventory().selectedSlot = slot;
+            return;
+        }
+
+        // Fallback: force slot 8 (index 7)
+        mc.player.getInventory().selectedSlot = 7;
+    }
+
+    private boolean swapToItem(net.minecraft.item.Item item) {
         for (int i = 0; i < 9; i++) {
             var stack = mc.player.getInventory().getStack(i);
-            if (!stack.isEmpty() && stack.getItem() == item) return true;
+            if (!stack.isEmpty() && stack.getItem() == item) {
+                mc.player.getInventory().selectedSlot = i;
+                return true;
+            }
         }
         return false;
     }
 
-    private boolean isValidPosition(BlockPos pos) {
-        if (mc.world == null) return false;
+    private boolean isValidAnchorPosition(BlockPos pos) {
+        if (mc.world == null || mc.player == null) return false;
         if (mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(pos)) > 4.5) return false;
         if (!mc.world.getBlockState(pos).isAir()) return false;
-
         BlockPos playerPos = mc.player.getBlockPos();
         return !pos.equals(playerPos) && !pos.equals(playerPos.up());
     }
 
-    private boolean isObsidianOrBedrock(BlockPos pos) {
-        if (mc.world == null) return false;
-        var block = mc.world.getBlockState(pos).getBlock();
-        return block == Blocks.OBSIDIAN || block == Blocks.BEDROCK;
-    }
-
-    private boolean isValidCrystalPosition(BlockPos pos) {
-        if (mc.world == null) return false;
-        if (mc.player.getEntityPos().distanceTo(Vec3d.ofCenter(pos)) > 4.5) return false;
-        if (!mc.world.getBlockState(pos).isAir()) return false;
-        if (!mc.world.getBlockState(pos.up()).isAir()) return false;
-
-        BlockPos playerPos = mc.player.getBlockPos();
-        return !pos.equals(playerPos) && !pos.equals(playerPos.up()) &&
-                !pos.up().equals(playerPos) && !pos.up().equals(playerPos.up());
-    }
-
-    private boolean isDeadPlayerNearby() {
-        if (mc.world == null) return false;
-        List<? extends Entity> players = mc.world.getPlayers();
-        for (Entity e : players) {
-            if (e == mc.player) continue;
-            if (e.isRemoved() || (e instanceof LivingEntity le && le.getHealth() <= 0.0f))
-                if (e.squaredDistanceTo(mc.player) < 36)
-                    return true;
+    private void restoreOriginalSlot() {
+        if (originalSlot != -1 && mc.player != null) {
+            mc.player.getInventory().selectedSlot = originalSlot;
         }
-        return false;
     }
 
+    private void scheduleRestoreOriginalSlot() {
+        if (originalSlot == -1) return;
+        // Reset tick counter every time to avoid stacking multiple restores
+        pendingRestoreSlot = true;
+        pendingRestoreTicksLeft = restoreDelayTicks.getValueInt();
+    }
+
+    private void cancelPendingRestore() {
+        pendingRestoreSlot = false;
+        pendingRestoreTicksLeft = 0;
+    }
+
+    @Override
+    public void onEnable() {
+        keyPressed = false;
+        isActive = false;
+        originalSlot = -1;
+        hasPlacedThisCycle = false;
+        pendingRestoreSlot = false;
+        pendingRestoreTicksLeft = 0;
+        timer.reset();
+        super.onEnable();
+    }
 
     @Override
     public void onDisable() {
+        stopAnchorPvP();
         super.onDisable();
-        stopCrystalPvP();
     }
 
     @Override
