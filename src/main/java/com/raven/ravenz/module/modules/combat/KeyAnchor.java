@@ -23,13 +23,11 @@ public final class KeyAnchor extends Module {
     private final KeybindSetting anchorKeybind = new KeybindSetting("Anchor Key", GLFW.GLFW_MOUSE_BUTTON_4, false);
     private final NumberSetting delay = new NumberSetting("Delay (MS)", 1, 500, 50, 1);
 
-    // Explode Slot settings
     private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
     private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 1, 1);
 
     private final TimerUtil timer = new TimerUtil();
 
-    // State
     private boolean keyPressed = false;
 
     public KeyAnchor() {
@@ -45,7 +43,6 @@ public final class KeyAnchor extends Module {
 
         boolean currentKeyState = KeyUtils.isKeyPressed(anchorKeybind.getKeyCode());
 
-        // Hold — fire repeatedly on timer while key is held
         if (currentKeyState) {
             if (timer.hasElapsedTime(delay.getValueInt())) {
                 processAnchorPvP();
@@ -70,12 +67,9 @@ public final class KeyAnchor extends Module {
         if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
             int charges = blockState.get(RespawnAnchorBlock.CHARGES);
             if (charges > 0) {
-                // Anchor is charged — explode it and STAY on explode slot
                 swapToExplodeSlot();
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                // Do NOT restore slot after explode — stay on explode slot permanently
             } else {
-                // Anchor is uncharged — recharge with glowstone
                 if (swapToItem(Items.GLOWSTONE)) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
                 }
@@ -83,27 +77,19 @@ public final class KeyAnchor extends Module {
             return;
         }
 
-        // Not an anchor — try to place one, then restore slot
         BlockPos placementPos = targetBlock.offset(blockHit.getSide());
         if (isValidAnchorPosition(placementPos)) {
             if (swapToItem(Items.RESPAWN_ANCHOR)) {
-                    ((MinecraftClientAccessor) mc).invokeDoItemUse();
-                }
+                ((MinecraftClientAccessor) mc).invokeDoItemUse();
+            }
         }
     }
 
-    /**
-     * Swap to the correct slot for exploding the anchor.
-     * - Use Explode Slot ON -> switch to configured slot (1-9)
-     * - OFF -> force slot 8 (index 7)
-     */
     private void swapToExplodeSlot() {
         if (useExplodeSlot.getValue()) {
             mc.player.getInventory().selectedSlot = explodeSlot.getValueInt() - 1;
             return;
         }
-
-        // Fallback: force slot 8 (index 7)
         mc.player.getInventory().selectedSlot = 7;
     }
 
@@ -124,12 +110,6 @@ public final class KeyAnchor extends Module {
         if (!mc.world.getBlockState(pos).isAir()) return false;
         BlockPos playerPos = mc.player.getBlockPos();
         return !pos.equals(playerPos) && !pos.equals(playerPos.up());
-    }
-
-    private void restoreOriginalSlot() {
-        if (originalSlot != -1 && mc.player != null) {
-            mc.player.getInventory().selectedSlot = originalSlot;
-        }
     }
 
     @Override
