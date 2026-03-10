@@ -5,6 +5,7 @@ import com.raven.ravenz.event.impl.player.TickEvent;
 import com.raven.ravenz.mixin.MinecraftClientAccessor;
 import com.raven.ravenz.module.Category;
 import com.raven.ravenz.module.Module;
+import com.raven.ravenz.module.setting.BooleanSetting;
 import com.raven.ravenz.module.setting.KeybindSetting;
 import com.raven.ravenz.module.setting.NumberSetting;
 import com.raven.ravenz.utils.keybinding.KeyUtils;
@@ -25,6 +26,10 @@ public final class KeyAnchor extends Module {
     private final NumberSetting delay = new NumberSetting("Delay (MS)", 1, 500, 50, 1);
     private final NumberSetting restoreDelayTicks = new NumberSetting("Restore Delay", 1, 20, 2, 1);
 
+    // Explode Slot settings
+    private final BooleanSetting useExplodeSlot = new BooleanSetting("Use Explode Slot", false);
+    private final NumberSetting explodeSlot = new NumberSetting("Explode Slot", 1, 9, 1, 1);
+
     private final TimerUtil timer = new TimerUtil();
     private boolean keyPressed = false;
     private boolean isActive = false;
@@ -35,7 +40,7 @@ public final class KeyAnchor extends Module {
 
     public KeyAnchor() {
         super("Key Anchor", "Automatically places and explodes respawn anchors for PvP", -1, Category.COMBAT);
-        this.addSettings(anchorKeybind, delay, restoreDelayTicks);
+        this.addSettings(anchorKeybind, delay, restoreDelayTicks, useExplodeSlot, explodeSlot);
         this.getSettings().removeIf(setting -> setting instanceof KeybindSetting && !setting.equals(anchorKeybind));
     }
 
@@ -103,7 +108,7 @@ public final class KeyAnchor extends Module {
         if (blockState.getBlock() == Blocks.RESPAWN_ANCHOR) {
             int charges = blockState.get(RespawnAnchorBlock.CHARGES);
             if (charges > 0) {
-                if (swapToItem(Items.TOTEM_OF_UNDYING) || swapToSword()) {
+                if (swapToExplodeSlot()) {
                     ((MinecraftClientAccessor) mc).invokeDoItemUse();
                     scheduleRestoreOriginalSlot();
                     hasPlacedThisCycle = true;
@@ -122,11 +127,28 @@ public final class KeyAnchor extends Module {
             if (swapToItem(Items.RESPAWN_ANCHOR)) {
                 hasPlacedThisCycle = true;
                 ((MinecraftClientAccessor) mc).invokeDoItemUse();
-
             }
         }
     }
 
+    /**
+     * Swap to the explode slot.
+     * - If "Use Explode Slot" is ON: switch to the configured hotbar slot (1–9 → index 0–8).
+     * - If OFF: fall back to the old behaviour (Totem first, then any sword).
+     */
+    private boolean swapToExplodeSlot() {
+        if (useExplodeSlot.isEnabled()) {
+            int slot = explodeSlot.getValueInt() - 1; // convert 1-9 display value to 0-8 index
+            var stack = mc.player.getInventory().getStack(slot);
+            if (!stack.isEmpty()) {
+                mc.player.getInventory().selectedSlot = slot;
+                return true;
+            }
+            return false;
+        }
+        // Legacy fallback: Totem → any sword
+        return swapToItem(Items.TOTEM_OF_UNDYING) || swapToSword();
+    }
 
     private boolean isValidAnchorPosition(BlockPos pos) {
         if (mc.world == null || mc.player == null) return false;
